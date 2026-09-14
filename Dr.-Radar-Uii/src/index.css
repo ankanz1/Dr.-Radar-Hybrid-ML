@@ -1,0 +1,187 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface-bright: #f8fbfe;
+  --color-surface: #f4f8fd;
+  --color-surface-dim: #eaf2fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8fbfe;
+  --color-surface-container: #f0f6fc;
+  --color-surface-container-high: #e2eef9;
+  --color-surface-variant: #e2eef9;
+  --color-on-surface: #101c28;
+  --color-on-surface-variant: #34485e;
+  --color-outline: #5c7b99;
+  --color-outline-variant: #c3daf2;
+  --color-primary: #d81b24;
+  --color-primary-container: #e52932;
+  --color-on-primary: #ffffff;
+  --color-primary-fixed: #e2f0fc;
+  --color-primary-fixed-dim: #c0defa;
+  --color-tertiary: #006b27;
+  --color-tertiary-container: #008733;
+  --color-tertiary-fixed: #72fe88;
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-secondary: #0058bc;
+  --color-secondary-container: #0070eb;
+  
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
+    background-color: #ffffff;
+    color: #101c28;
+  }
+  body {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+    font-family: var(--font-sans);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* Animations */
+@keyframes dash {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Matte 3D Translucent Glassmorphism Surface (Zero Drop-Shadow, Translucent Frosted Matte, Tactile 3D Rim, Non-Interactive) */
+.matte-3d-card,
+.glass-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 248, 255, 0.52) 100%) !important;
+  backdrop-filter: blur(24px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(140%) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.85) !important;
+  border-right: 1.5px solid rgba(215, 232, 248, 0.50) !important;
+  border-bottom: 2px solid rgba(195, 220, 245, 0.60) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Strictly non-interactive: zero lift, zero scaling, zero shadow */
+.matte-3d-card:hover,
+.glass-card:hover,
+.matte-3d-card:active,
+.glass-card:active {
+  transform: none !important;
+  box-shadow: none !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 248, 255, 0.52) 100%) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  border-left: 1.5px solid rgba(255, 255, 255, 0.85) !important;
+  border-right: 1.5px solid rgba(215, 232, 248, 0.50) !important;
+  border-bottom: 2px solid rgba(195, 220, 245, 0.60) !important;
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-80%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(220%);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+}
+
+.animate-dash {
+  animation: dash 2.5s linear infinite;
+}
+
+.animate-scan {
+  animation: scan 3s ease-in-out infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 1.8s ease-in-out infinite;
+}
+
+/* Globally hide scrollbars across all browsers and elements while preserving scrolling */
+* {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera */
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+html,
+body,
+#root {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}

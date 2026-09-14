@@ -1,0 +1,64 @@
+# =========================
+# Frontend: Dr.-Radar-Uii
+# =========================
+
+Dr.-Radar-Uii/node_modules/
+Dr.-Radar-Uii/dist/
+Dr.-Radar-Uii/.vite/
+Dr.-Radar-Uii/.env
+Dr.-Radar-Uii/.env.*
+!Dr.-Radar-Uii/.env.example
+
+
+# =========================
+# Backend: ecg-qml
+# =========================
+
+ecg-qml/.venv/
+ecg-qml/__pycache__/
+ecg-qml/**/__pycache__/
+ecg-qml/.pytest_cache/
+ecg-qml/.mypy_cache/
+ecg-qml/.ruff_cache/
+ecg-qml/.env
+ecg-qml/.env.*
+!ecg-qml/.env.example
+
+# Python compiled files
+ecg-qml/**/*.pyc
+ecg-qml/**/*.pyo
+ecg-qml/**/*.pyd
+
+# Logs / runtime files
+ecg-qml/*.log
+ecg-qml/**/*.log
+ecg-qml/*.pid
+ecg-qml/**/*.pid
+
+
+# =========================
+# ECG datasets
+# =========================
+
+# Large raw datasets should not be committed
+ecg-qml/data/mitbih_train.csv
+ecg-qml/data/mitbih_test.csv
+ecg-qml/data/ptbdb_abnormal.csv
+ecg-qml/data/ptbdb_normal.csv
+
+# Also ignore datasets if accidentally placed at repo root
+mitbih_train.csv
+mitbih_test.csv
+ptbdb_abnormal.csv
+ptbdb_normal.csv
+
+
+# =========================
+# General
+# =========================
+
+*.tmp
+*.temp
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+server.log
+
+# Local environment
+.env
+
+# Outputs (generated plots, metrics, explanations)
+outputs/
+!outputs/.gitkeep
+
+# Model checkpoints (keep the frozen production artifacts)
+models/ecg_hybrid_qml.pt
+models/ecg_hybrid_qml_medium.pt
+models/ecg_hybrid_qml_mlp_head.pt
+models/ecg_hybrid_qml_pca12.pt
+models/ecg_mlp.pth
+models/ecg_qml_preprocessing.joblib
+models/ecg_qml_medium_preprocessing.joblib
+models/ecg_qml_mlp_head_preprocessing.joblib
+models/ecg_qml_pca12_preprocessing.joblib
+models/ecg_qml_selected_preprocessing.joblib
+models/ecg_scaler.joblib
+models/ecg_scaler_pca.joblib
+models/ecg_xgb_pca8.json
+models/ecg_xgboost.json
+models/model_metadata.json
+
+# Keep the production frozen artifacts:
+# models/ecg_hybrid_qml_balanced.pt
+# models/ecg_qml_balanced_preprocessing.joblib

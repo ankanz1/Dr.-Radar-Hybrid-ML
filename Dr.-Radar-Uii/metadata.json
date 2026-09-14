@@ -1,0 +1,8 @@
+{
+  "name": "Dr. Radar",
+  "description": "AI-powered cardiac monitoring and screening application with live vital tracking, specialist booking, and clinical results analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

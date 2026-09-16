@@ -1,8 +1,6 @@
 # Dr. Radar
 ## Hybrid Quantum-Classical Machine Learning Platform for Early Disease Detection
 
-> **SIH 2026 Project**
-
 Dr. Radar is an end-to-end research and decision-support platform that combines classical machine learning, quantum machine learning (QML), explainable AI (XAI), and biomedical data processing for early disease-risk classification.
 
 The platform is designed around a practical principle:

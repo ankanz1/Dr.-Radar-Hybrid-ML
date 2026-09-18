@@ -9,8 +9,6 @@ The platform is designed around a practical principle:
 
 Dr. Radar preprocesses biomedical data, performs feature selection and dimensionality reduction, trains strong classical baselines and quantum/hybrid models, evaluates them under ideal and noisy conditions, and presents explainable predictions through a web dashboard.
 
-**Important:** Dr. Radar is a research prototype and is **not a medical diagnostic device**. Its predictions must not be used as a substitute for clinical assessment.
-
 ---
 
 ## Table of Contents

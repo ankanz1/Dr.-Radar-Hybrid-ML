@@ -220,6 +220,7 @@ The platform combines:
 - quantum circuit visualization;
 - quantum parameter/measurement information.
 
+
 ---
 
 # System Architecture

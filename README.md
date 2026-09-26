@@ -7,6 +7,7 @@ The platform is designed around a practical principle:
 
 > **Do not assume quantum advantage. Measure it.**
 
+
 Dr. Radar preprocesses biomedical data, performs feature selection and dimensionality reduction, trains strong classical baselines and quantum/hybrid models, evaluates them under ideal and noisy conditions, and presents explainable predictions through a web dashboard.
 
 ---

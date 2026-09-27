@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { OnboardingStep, UserRole, UserAccountState, ProfilePictureType } from '../../types';
 import { DrRadarLogo } from '../DrRadarLogo';
 import { LegalDocsModal } from './LegalDocsModal';
+import { supabase } from '../../lib/supabase';
 import { DR_RADAR_AVATARS, NEUTRAL_DEFAULT_AVATAR, resolveUserAvatarUrl } from '../../data/avatarsData';
 
 interface OnboardingFlowProps {
@@ -11,7 +12,10 @@ interface OnboardingFlowProps {
   user: UserAccountState;
   onUpdateProfile: (updates: Partial<UserAccountState>) => void;
   onSetConsent: (termsAccepted: boolean, privacyPolicyAccepted: boolean, researchConsent: boolean) => void;
-  onCompleteOnboarding: (role?: UserRole) => void;
+  onCompleteOnboarding: (
+    role?: UserRole,
+    profileOverrides?: Partial<UserAccountState>
+  ) => Promise<{ ok: boolean; message?: string }>;
 }
 
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
@@ -63,12 +67,43 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
   const [profileDisplayName, setProfileDisplayName] = useState(
     user.displayName || (infoFirstName ? `${infoFirstName} ${infoLastName}` : 'Alex Vance')
   );
   const [profRole, setProfRole] = useState(user.professionalRole || 'Clinical Fellow');
   const [specialization, setSpecialization] = useState(user.specialization || 'Cardiology');
   const [organization, setOrganization] = useState(user.organization || 'General Medical Institute');
+
+  // Temporary development diagnostics for OAuth — never log tokens/secrets.
+  const logOAuth = (message: string, details?: Record<string, unknown>) => {
+    if (import.meta.env.DEV) {
+      console.log(`[onboarding:oauth] ${message}`, details ?? '');
+    }
+  };
+
+  const startOAuth = async (provider: 'google' | 'facebook') => {
+    setAuthError(null);
+    logOAuth(`initiating ${provider} sign-in`, {
+      provider,
+      redirectTo: window.location.origin,
+    });
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) {
+      // Surface the error — never swallow it.
+      logOAuth(`${provider} signInWithOAuth failed`, {
+        code: error.code ?? null,
+        message: error.message,
+        status: error.status ?? null,
+      });
+      setAuthError(`${provider} sign-in failed: ${error.message}`);
+    }
+    // On success the browser is redirected to the provider — nothing else to do here.
+  };
 
   const handleFileUpload = (file: File) => {
     setUploadError(null);
@@ -127,7 +162,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   }, [currentStep, onStepChange]);
 
   // Auth Handler
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
 
@@ -146,27 +181,81 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
         setAuthError('Please provide your first and last name.');
         return;
       }
-      if (authPassword !== authConfirmPassword) {
-        setAuthError('Passwords do not match. Please re-enter.');
+
+      const { data, error } = await supabase.auth.signUp({
+        email: authEmail,
+        password: authPassword,
+        options: {
+          // Return the confirmed user to the app to finish onboarding
+          emailRedirectTo: window.location.origin,
+        },
+      });
+
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.error('[onboarding:auth] signUp FAILED', {
+            operation: 'supabase.auth.signUp',
+            'supabase error code': error.code ?? null,
+            'supabase error message': error.message,
+            'supabase error status': error.status ?? null,
+          });
+        }
+        setAuthError(error.message || 'Sign-up failed. Please try again.');
         return;
       }
-      onUpdateProfile({
-        firstName: authFirstName,
-        lastName: authLastName,
-        displayName: `${authFirstName} ${authLastName}`,
-        email: authEmail,
-      });
-      setInfoFirstName(authFirstName);
-      setInfoLastName(authLastName);
-      onStepChange('basic-info');
-    } else {
-      // Sign In simulation
-      onUpdateProfile({
-        email: authEmail,
-      });
-      // Direct existing user forward
-      onStepChange('role-selection');
+
+      if (data.session) {
+        // Email confirmation is disabled (autoconfirm): the user is signed in NOW
+        onUpdateProfile({ email: authEmail, firstName: authFirstName, lastName: authLastName });
+        onStepChange('role-selection');
+        return;
+      }
+
+      // No session → email confirmation is required. Account EXISTS in auth.users,
+      // but we must NOT continue onboarding or attempt any authenticated DB writes.
+      setAuthError(
+        'Account created. Check your inbox and confirm your email address, then sign in to continue.'
+      );
+      return;
     }
+
+    // Sign in with Supabase Auth
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: authEmail,
+      password: authPassword,
+    });
+
+    if (error) {
+      if (import.meta.env.DEV) {
+        console.error('[onboarding:auth] signInWithPassword FAILED', {
+          operation: 'supabase.auth.signInWithPassword',
+          'supabase error code': error.code ?? null,
+          'supabase error message': error.message,
+          'supabase error status': error.status ?? null,
+        });
+      }
+      // Map auth errors to clear user-facing messages
+      if (error.code === 'invalid_credentials') {
+        setAuthError('Incorrect email or password. Please try again.');
+      } else if (error.code === 'email_not_confirmed') {
+        setAuthError('Please confirm your email address first — check your inbox for the confirmation link.');
+      } else {
+        setAuthError(error.message || 'Sign-in failed. Please check your credentials and try again.');
+      }
+      return;
+    }
+
+    if (!data.session) {
+      // Defensive: never continue without a real session
+      setAuthError('Sign-in did not return a session. Please try again.');
+      return;
+    }
+
+    // Sign-in successful - continue existing onboarding flow
+    onUpdateProfile({
+      email: authEmail,
+    });
+    onStepChange('role-selection');
   };
 
   // Basic Info Handler
@@ -203,9 +292,38 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   };
 
   // Profile Setup Complete Handler
+  // onFinish builds the FINAL profile values from this component's state and passes
+  // them explicitly to the completion callback — the parent's `user` state has not
+  // re-rendered yet at that moment (stale closure), and OAuth users must not rely
+  // on provider metadata for their names.
+  const finishOnboarding = async (overrides: Partial<UserAccountState>) => {
+    setIsCompleting(true);
+    setCompletionError(null);
+    onUpdateProfile(overrides);
+    const result = await onCompleteOnboarding(selectedRole, {
+      ...overrides,
+      firstName: infoFirstName || overrides.firstName || user.firstName,
+      lastName: infoLastName || overrides.lastName || user.lastName,
+      displayName: profileDisplayName || overrides.displayName,
+    });
+    setIsCompleting(false);
+    if (!result?.ok) {
+      // Do NOT advance to the dashboard as if profile creation succeeded.
+      // In development show the real database error; in production show a friendly message.
+      const isDev = import.meta.env.DEV;
+      setCompletionError(
+        result?.message ||
+          "We couldn't save your profile. Please check your connection and try again."
+      );
+      if (isDev && result?.message) {
+        console.error('[onboarding] profile save failed with live error (shown above):', result.message);
+      }
+    }
+  };
+
   const handleProfileComplete = () => {
     const resolved = resolveUserAvatarUrl(profilePictureType, profilePictureValue);
-    onUpdateProfile({
+    void finishOnboarding({
       profilePictureType,
       profilePicture: profilePictureValue,
       avatarUrl: resolved,
@@ -215,18 +333,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
       organization: selectedRole !== 'patient' ? organization : undefined,
       profileCompleted: true,
     });
-    onCompleteOnboarding(selectedRole);
   };
 
   // Profile Skip Handler (Mandate: never block users, defaults to neutral avatar)
   const handleProfileSkip = () => {
-    onUpdateProfile({
+    void finishOnboarding({
       profilePictureType: 'none',
       profilePicture: null,
       avatarUrl: undefined,
       profileCompleted: false, // flag as incomplete for the 60% completion prompt
     });
-    onCompleteOnboarding(selectedRole);
   };
 
   return (
@@ -409,8 +525,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               <div className="grid grid-cols-3 gap-2.5 text-left py-1">
                 <div className="bg-[#f8fafc] p-3 rounded-2xl border border-slate-100">
                   <span className="material-symbols-outlined text-[18px] text-[#bc000a]">cardiology</span>
-                  <div className="font-bold text-xs text-slate-800 mt-1">Arrhythmia</div>
-                  <div className="text-[10px] text-slate-500">ECG Telemetry</div>
+                  <div className="font-bold text-xs text-slate-800 mt-1">Early Ditection</div>
+                  <div className="text-[10px] text-slate-500">Time Saving</div>
                 </div>
                 <div className="bg-[#f8fafc] p-3 rounded-2xl border border-slate-100">
                   <span className="material-symbols-outlined text-[18px] text-blue-600">neurology</span>
@@ -511,6 +627,41 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 >
                   Sign In
                 </button>
+              </div>
+
+              {/* Social Authentication */}
+              <div className="mt-4 space-y-2">
+                <span className="text-xs text-slate-500 font-medium text-center">OR CONTINUE WITH</span>
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void startOAuth('google');
+                    }}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer w-full sm:w-48 border border-slate-200/80 bg-white hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[#bc000a]/20 focus-visible:ring-offset-2,disabled:opacity-50 disabled:pointer-events-none`}
+                  >
+                    <img
+                      src="/google.png"
+                      alt="Google"
+                      className="flex-shrink-0 w-5 h-5 object-contain"
+                    />
+                    <span className="hidden sm:inline">Continue with Google</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void startOAuth('facebook');
+                    }}
+                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer w-full sm:w-48 border border-slate-200/80 bg-white hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[#bc000a]/20 focus-visible:ring-offset-2,disabled:opacity-50 disabled:pointer-events-none`}
+                  >
+                    <img
+                      src="/facebook.png"
+                      alt="Facebook"
+                      className="flex-shrink-0 w-5 h-5 object-contain"
+                    />
+                    <span className="hidden sm:inline">Continue with Facebook</span>
+                  </button>
+                </div>
               </div>
 
               {authError && (
@@ -876,7 +1027,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 {/* 3. Researcher */}
                 <div
                   onClick={() => setSelectedRole('researcher')}
-                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${
+                  className={`hidden p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-start gap-3.5 ${
                     selectedRole === 'researcher'
                       ? 'border-[#bc000a] bg-red-50/20 shadow-xs'
                       : 'border-slate-200 hover:border-slate-300 bg-white'
@@ -915,7 +1066,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                   onClick={handleRoleSubmit}
                   className="w-full py-3 rounded-xl bg-[#bc000a] text-white font-bold text-xs shadow-md shadow-[#bc000a]/20 hover:bg-[#a50009] transition-all cursor-pointer"
                 >
-                  Continue as {selectedRole === 'doctor' ? 'Healthcare Professional' : selectedRole === 'researcher' ? 'Researcher' : 'Patient'}
+                  Continue as {selectedRole === 'doctor' ? 'Healthcare Professional' : 'Patient'}
                 </button>
               </div>
             </motion.div>
@@ -1358,18 +1509,26 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               )}
 
               {/* Actions */}
+              {completionError && (
+                <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-100 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">error</span>
+                  <span>{completionError}</span>
+                </div>
+              )}
               <div className="pt-2 flex items-center gap-3">
                 <button
                   id="profile-complete-btn"
                   onClick={handleProfileComplete}
-                  className="flex-1 py-3 rounded-xl bg-[#bc000a] text-white font-bold text-xs shadow-md shadow-[#bc000a]/20 hover:bg-[#a50009] transition-all cursor-pointer"
+                  disabled={isCompleting}
+                  className="flex-1 py-3 rounded-xl bg-[#bc000a] text-white font-bold text-xs shadow-md shadow-[#bc000a]/20 hover:bg-[#a50009] transition-all cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
                 >
-                  Complete Profile
+                  {isCompleting ? 'Saving Profile…' : 'Complete Profile'}
                 </button>
                 <button
                   id="profile-skip-btn"
                   onClick={handleProfileSkip}
-                  className="py-3 px-5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                  disabled={isCompleting}
+                  className="py-3 px-5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
                 >
                   Skip for Now
                 </button>

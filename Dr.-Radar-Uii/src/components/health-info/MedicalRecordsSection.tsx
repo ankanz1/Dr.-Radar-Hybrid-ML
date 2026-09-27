@@ -158,9 +158,7 @@ export const MedicalRecordsSection: React.FC<MedicalRecordsSectionProps> = ({
             <label className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
               Step 1: Select Document Category
             </label>
-            <span className="text-[11px] text-slate-400">
-              Not sure? Choose <strong className="text-slate-600">Other</strong>
-            </span>
+            
           </div>
           <div className="flex flex-wrap gap-2">
             {CATEGORY_OPTIONS.map((cat) => (

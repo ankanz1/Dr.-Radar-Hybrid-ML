@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { UserAccountState, UserRole, OnboardingStep, ProfilePictureType } from '../types';
 import { resolveUserAvatarUrl, NEUTRAL_DEFAULT_AVATAR_URL } from '../data/avatarsData';
+import { syncAccountProvisioning, fetchOwnUsersRow, readLocalDraft } from '../services/accountProvisioning';
 
 const STORAGE_KEY = 'dr_radar_account_v2';
 const ONBOARDING_STEP_KEY = 'dr_radar_onboarding_step_v2';
 
 const DEFAULT_USER: UserAccountState = {
-  userId: 'USR-89410',
-  firstName: 'Alexander',
-  lastName: 'Vance',
-  displayName: 'Alex Vance',
-  email: 'a.vance@cardio-telemetry.med',
+  userId: 'USR-00000',
+  firstName: '',
+  lastName: '',
+  displayName: '',
+  email: '',
+  // UserRole has no empty member; 'patient' is the neutral default until the
+  // user picks a role during onboarding (App falls back to 'patient' anyway).
   role: 'patient',
   profilePictureType: 'none',
   profilePicture: null,
@@ -50,13 +54,22 @@ export function useUserAccount() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored) as UserAccountState;
+        // The researcher workspace has been retired; migrate persisted accounts
+        // to the patient experience so no retired navigation is restored.
+        return parsed.role === 'researcher' ? { ...parsed, role: 'patient' } : parsed;
       }
     } catch {
       // Fallback
     }
     return DEFAULT_USER;
   });
+
+  // Supabase session state — source of truth for authentication
+  const [supabaseSession, setSupabaseSession] = useState<
+    | { user: { id: string; email: string } | null }
+    | null
+  >(null);
 
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
     try {
@@ -100,6 +113,125 @@ export function useUserAccount() {
       // ignore
     }
   }, [currentStep]);
+
+  // Synchronize local user email with Supabase Auth session
+  useEffect(() => {
+    if (supabaseSession?.user?.email) {
+      setUser((prev) => ({
+        ...prev,
+        email: supabaseSession.user.email,
+      }));
+    }
+  }, [supabaseSession]);
+
+  // OAuth-return / login synchronization:
+  // - Wait for a real session (INITIAL_SESSION or SIGNED_IN) before any DB work.
+  // - Provision public.users only when missing (insert-if-missing; never overwrite).
+  // - Completed accounts land on the dashboard; in-progress onboarding resumes where
+  //   it left off (OAuth redirect loses component state — the step is persisted).
+  const syncHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    const sessionUser = supabaseSession?.user;
+    if (!sessionUser) return;
+    if (syncHandledRef.current === sessionUser.id) return; // one sync per session
+    syncHandledRef.current = sessionUser.id;
+
+    let cancelled = false;
+    (async () => {
+      const draft = readLocalDraft();
+      const result = await syncAccountProvisioning(sessionUser, {
+        role: draft.role,
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        displayName: draft.displayName,
+      });
+      if (cancelled) return;
+      if (!result.ok && import.meta.env.DEV) {
+        console.error('[account] login-time provisioning failed:', result.message);
+      }
+
+      const own = await fetchOwnUsersRow(sessionUser.id);
+      if (cancelled || !own) return;
+
+      if (own.onboardingCompleted) {
+        setUser((prev) => ({
+          ...prev,
+          role: own.role ?? prev.role,
+          onboardingCompleted: true,
+        }));
+        setIsOnboardingActive(false);
+        setCurrentStep('completed');
+      } else {
+        // Onboarding incomplete — the DATABASE value is authoritative over
+        // localStorage (which may claim onboardingCompleted: true via
+        // DEFAULT_USER's leaked default). Persist the DB truth so the
+        // localStorage-based effect below cannot close onboarding again.
+        setUser((prev) => ({
+          ...prev,
+          role: own.role ?? prev.role,
+          onboardingCompleted: false,
+        }));
+        setIsOnboardingActive(true);
+        // Reset a stale stored step so the flow resumes visibly; 'completed'
+        // has no render branch in OnboardingFlow and would render blank.
+        setCurrentStep((step) => (step === 'completed' ? 'role-selection' : step));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabaseSession]);
+
+  // Update onboarding state when Supabase session changes
+  // (e.g., after email-confirmation redirect, the session becomes available)
+  useEffect(() => {
+    // Run only when there is **no** active Supabase session. This prevents stale
+    // localStorage onboarding data from overwriting the DB‑derived onboarding state
+    // after a successful OAuth login.
+    if (!supabaseSession) {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) {
+          // No local onboarding state — start onboarding from the beginning
+          setIsOnboardingActive(true);
+        } else {
+          const parsed = JSON.parse(stored);
+          if (!parsed.onboardingCompleted) {
+            // Onboarding not yet completed — continue the existing onboarding flow
+            setIsOnboardingActive(true);
+          } else {
+            // Onboarding already completed — do not restart onboarding
+            setIsOnboardingActive(false);
+          }
+        }
+      } catch {
+        // Error parsing localStorage — default to starting onboarding
+        setIsOnboardingActive(true);
+      }
+    }
+    // If supabaseSession is present, keep the DB‑derived onboarding state.
+  }, [supabaseSession]);
+
+  // Initialize Supabase session on hook mount
+  useEffect(() => {
+    // Obtain the current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSupabaseSession(session);
+    });
+
+    // Subscribe to authentication state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setSupabaseSession(session);
+    });
+
+    return () => {
+      // Clean up subscription on unmount
+      subscription.unsubscribe();
+    };
+  }, []); // Empty deps — run once on mount
 
   const startOnboarding = (initialStep: OnboardingStep = 'entry-animation') => {
     setCurrentStep(initialStep);
@@ -196,7 +328,13 @@ export function useUserAccount() {
     }));
   };
 
-  const signOut = () => {
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      // Suppress sign-out errors — still reset local state
+      console.error('Supabase sign out error:', err);
+    }
     // Return to entry/welcome screen and reset active state
     setUser((prev) => ({
       ...prev,
@@ -292,5 +430,6 @@ export function useUserAccount() {
     signOut,
     deleteAccount,
     exportUserData,
+    supabaseSession,
   };
 }

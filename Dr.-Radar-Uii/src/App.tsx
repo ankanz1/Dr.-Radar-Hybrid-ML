@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ScreenTab, UserRole, HistoryReport } from './types';
+import { ScreenTab, UserRole, HistoryReport, UserAccountState } from './types';
 import { Navigation } from './components/Navigation';
+import { supabase } from './lib/supabase';
 
 // Patient Experience Screens
+import { JourneyHomeScreen } from './components/JourneyHomeScreen';
+import { HealthAssessmentScreen } from './components/HealthAssessmentScreen';
+import { UploadAnalyzeScreen } from './components/UploadAnalyzeScreen';
+import { PatientJourneyRecordsScreen } from './components/PatientJourneyRecordsScreen';
+import { ConnectDoctorScreen } from './components/ConnectDoctorScreen';
+import { PatientJourneyAppointmentsScreen } from './components/PatientJourneyAppointmentsScreen';
 import { PatientHomeScreen } from './components/PatientHomeScreen';
 import { PatientEcgScreen } from './components/PatientEcgScreen';
+import { PatientEcgHistoryScreen } from './components/PatientEcgHistoryScreen';
 import { PatientResultsScreen } from './components/PatientResultsScreen';
 import { PatientProfileScreen } from './components/PatientProfileScreen';
 import { BookingScreen } from './components/BookingScreen';
@@ -16,14 +24,7 @@ import { DoctorPatientsScreen } from './components/DoctorPatientsScreen';
 import { DoctorAlertsScreen } from './components/DoctorAlertsScreen';
 import { DoctorReportsScreen } from './components/DoctorReportsScreen';
 import { ECGAnalysisScreen } from './components/ECGAnalysisScreen';
-
-// Advanced Research & Diagnostic Screens (Secondary)
-import { OverviewScreen } from './components/OverviewScreen';
-import { QuantumLabScreen } from './components/QuantumLabScreen';
-import { ExplainabilityScreen } from './components/ExplainabilityScreen';
-import { BenchmarksScreen } from './components/BenchmarksScreen';
-import { ExperimentsScreen } from './components/ExperimentsScreen';
-import { DatasetScreen } from './components/DatasetScreen';
+import { DoctorPatientEcgDashboard } from './components/DoctorPatientEcgDashboard';
 
 // Modals & Account Management
 import { FullReportModal } from './components/FullReportModal';
@@ -40,6 +41,7 @@ import { useUserAccount } from './hooks/useUserAccount';
 import { ProfileAvatar } from './components/profile/ProfileAvatar';
 import { ProfilePictureModal } from './components/profile/ProfilePictureModal';
 import { useHealthInformation } from './hooks/useHealthInformation';
+import { provisionAccount } from './services/accountProvisioning';
 
 // Multimodal Analysis Hub & Reusable Architecture
 import { AnalysisHubScreen } from './components/AnalysisHubScreen';
@@ -78,11 +80,11 @@ export default function App() {
     contextSummary: healthSummary,
   } = useHealthInformation();
 
-  const [userRole, setUserRole] = useState<UserRole>(user.role || 'patient');
+  const [userRole, setUserRole] = useState<UserRole>(user.role === 'researcher' ? 'patient' : user.role || 'patient');
   const [currentTab, setCurrentTab] = useState<ScreenTab>(
-    user.role === 'doctor' ? 'doctor-dashboard' : user.role === 'researcher' ? 'explainability' : 'patient-home'
+    user.role === 'doctor' ? 'doctor-dashboard' : 'journey-home'
   );
-  const [selectedDoctorPatientId, setSelectedDoctorPatientId] = useState<string>('p-102');
+  const [selectedDoctorPatientId, setSelectedDoctorPatientId] = useState<string | null>(null);
   const [selectedModalityTestId, setSelectedModalityTestId] = useState<string>('imaging-cxr');
   const [activeReportModal, setActiveReportModal] = useState<Partial<HistoryReport> | null>(null);
   const [globalToast, setGlobalToast] = useState<{ message: string; type?: 'success' | 'info' | 'warning' } | null>(null);
@@ -115,26 +117,52 @@ export default function App() {
     setUserRole(newRole);
     updateRole(newRole);
     if (newRole === 'patient') {
-      setCurrentTab('patient-home');
+      setCurrentTab('journey-home');
     } else if (newRole === 'doctor') {
       setCurrentTab('doctor-dashboard');
-    } else {
-      setCurrentTab('explainability');
     }
   };
 
-  const handleCompleteOnboarding = (role?: UserRole) => {
+const handleCompleteOnboarding = async (
+    role?: UserRole,
+    profileOverrides?: Partial<UserAccountState>
+  ): Promise<{ ok: boolean; message?: string }> => {
+    // Merge onboarding-entered values explicitly passed by OnboardingFlow — App's
+    // `user` state has not re-rendered yet when this runs in the same tick.
+    const profile: UserAccountState = { ...user, ...profileOverrides };
+    const result = await provisionAccount({
+      role: role || user.role,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      displayName: profile.displayName,
+      email: profile.email,
+      avatarUrl: profile.avatarUrl,
+      profileCompleted: profile.profileCompleted,
+      dob: profile.dob,
+      gender: profile.gender,
+      country: profile.country,
+      language: profile.language,
+      professionalRole: profile.professionalRole,
+      specialization: profile.specialization,
+      organization: profile.organization,
+    });
+
+    if (!result.ok) {
+      // Do NOT finish onboarding when provisioning fails — the user stays here
+      // and the actual error is shown in development.
+      return result;
+    }
+
+    completeOnboarding(role || user.role || 'patient');
+    setUserRole(role || user.role || 'patient');
     const finalRole = role || user.role || 'patient';
-    completeOnboarding(finalRole);
-    setUserRole(finalRole);
-    if (finalRole === 'patient') {
-      setCurrentTab('patient-home');
-    } else if (finalRole === 'doctor') {
+    if (finalRole === 'doctor') {
       setCurrentTab('doctor-dashboard');
     } else {
-      setCurrentTab('explainability');
+      setCurrentTab('journey-home');
     }
-    showToast(`Welcome to Dr. Radar, ${user.displayName || 'Doctor'}!`, 'success');
+    showToast(`Welcome to Dr. Radar, ${profile.displayName || 'Doctor'}!`, 'success');
+    return { ok: true };
   };
 
   const handleDownloadReport = () => {
@@ -145,7 +173,7 @@ export default function App() {
   };
 
   // Tab metadata for top bar headers
-  const tabMetadata: Record<ScreenTab, { title: string; subtitle: string; icon: string; badge: string }> = {
+  const tabMetadata: Partial<Record<ScreenTab, { title: string; subtitle: string; icon: string; badge: string }>> = {
     // Core Navigation Tabs
     home: {
       title: userRole === 'patient' ? 'Heart Health Overview' : 'Cardiology Review Dashboard',
@@ -197,6 +225,42 @@ export default function App() {
     },
 
     // Patient Tabs
+    'journey-home': {
+      title: userRole === 'patient' ? 'How is your health?' : 'Cardiology Review Dashboard',
+      subtitle: 'Your health overview, latest results, and next steps',
+      icon: 'home',
+      badge: 'Patient First',
+    },
+    'journey-assessment': {
+      title: 'Health Assessment',
+      subtitle: 'A few quick questions that give your doctor context',
+      icon: 'health_and_safety',
+      badge: 'Step 1',
+    },
+    'journey-upload': {
+      title: 'Upload Health Record',
+      subtitle: 'Upload an ECG or health record for analysis',
+      icon: 'cloud_upload',
+      badge: 'Step 2',
+    },
+    'journey-records': {
+      title: 'My Records',
+      subtitle: 'Uploaded health records and saved analysis results',
+      icon: 'folder_shared',
+      badge: 'History',
+    },
+    'journey-doctors': {
+      title: 'Connect With Doctor',
+      subtitle: 'Registered doctors and appointment booking',
+      icon: 'stethoscope',
+      badge: 'Care Team',
+    },
+    'journey-appointments': {
+      title: 'Appointments',
+      subtitle: 'Your consultations and care team',
+      icon: 'calendar_today',
+      badge: 'Care Team',
+    },
     'patient-home': {
       title: 'Heart Health Overview',
       subtitle: 'Daily telemetry summary, rhythm stability status, and next actions',
@@ -208,6 +272,12 @@ export default function App() {
       subtitle: 'Real-time continuous lead monitoring & diagnostic 30-sec recording',
       icon: 'vital_signs',
       badge: '125 Hz Lead II',
+    },
+    'patient-ecg-history': {
+      title: 'My ECG History',
+      subtitle: 'Previously analyzed heartbeats saved to your personal medical history',
+      icon: 'history',
+      badge: 'Saved Analyses',
     },
     'patient-results': {
       title: 'Diagnostic Reports & Trends',
@@ -247,6 +317,12 @@ export default function App() {
       icon: 'dashboard',
       badge: '142 Active Patients',
     },
+    'doctor-ecg-records': {
+      title: 'Patient ECG Records',
+      subtitle: 'Stored ECG analyses for appointment-authorized patients — read-only, RLS-enforced',
+      icon: 'ecg_heart',
+      badge: 'Authorized Access',
+    },
     'doctor-patients': {
       title: 'Patient Detail & Telemetry Chart',
       subtitle: 'Holistic patient records, 5-class AAMI predictions, probability distribution & notes',
@@ -272,43 +348,6 @@ export default function App() {
       badge: 'Physician Sign-Off',
     },
 
-    // Research & Advanced Areas
-    overview: {
-      title: 'Biomedical Telemetry & Overview',
-      subtitle: 'Real-time patient monitoring, 5-class AAMI predictions & system status',
-      icon: 'hub',
-      badge: 'Telemetry Stream',
-    },
-    dataset: {
-      title: 'Biomedical Dataset Catalog',
-      subtitle: 'MIT-BIH Arrhythmia Database, PTB-XL, Inter-Patient split & annotation audit',
-      icon: 'database',
-      badge: '109,449 Beats',
-    },
-    'quantum-lab': {
-      title: 'Quantum Variational Lab & Circuit Explorer',
-      subtitle: '10-Qubit strongly entangling ansatz, angle encoding & Pauli-Z observables',
-      icon: 'memory',
-      badge: 'AerSim Statevector',
-    },
-    explainability: {
-      title: 'Explainable AI & Electrophysiological Saliency',
-      subtitle: 'Integrated gradients attribution, P-QRS-T phase mappings & Quantum SHAP',
-      icon: 'insights',
-      badge: 'AAMI EC57',
-    },
-    benchmarks: {
-      title: 'Model Benchmarking & Comparative Empirical Audit',
-      subtitle: 'Hybrid VQC vs Classical ResNet-18, 1D-CNN, SVM & Confusion Matrices',
-      icon: 'query_stats',
-      badge: 'Inter-Patient DS1/DS2',
-    },
-    experiments: {
-      title: 'Quantum Experiment Registry & Training Logs',
-      subtitle: 'Ablation telemetry, circuit depth sweeps, angle encoding & convergence audits',
-      icon: 'science',
-      badge: 'Run Registry',
-    },
   };
 
   const activeMeta = tabMetadata[currentTab] || tabMetadata['patient-home'];
@@ -440,18 +479,6 @@ export default function App() {
                 <span className="material-symbols-outlined text-[15px]">stethoscope</span>
                 <span className="hidden sm:inline">Doctor</span>
               </button>
-              <button
-                id="topbar-role-researcher"
-                onClick={() => handleRoleChange('researcher')}
-                className={`py-1 px-2 sm:px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
-                  userRole === 'researcher'
-                    ? 'bg-white text-[#bc000a] shadow-xs'
-                    : 'text-slate-600 hover:text-[#101c28]'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[15px]">science</span>
-                <span className="hidden sm:inline">Research</span>
-              </button>
             </div>
 
             {/* Notifications Button */}
@@ -463,8 +490,8 @@ export default function App() {
             >
               <span className="material-symbols-outlined text-[19px]">notifications</span>
             </button>
-
-            {/* Account Settings Button */}
+{/* 
+            Account Settings Button
             <button
               id="topbar-settings-btn"
               onClick={() => {
@@ -475,7 +502,7 @@ export default function App() {
               title="Settings & Privacy"
             >
               <span className="material-symbols-outlined text-[19px]">tune</span>
-            </button>
+            </button> */}
 
             {/* User Profile Dropdown Pill */}
             <div className="relative">
@@ -731,6 +758,84 @@ export default function App() {
                 </motion.div>
               )}
 
+              {/* PATIENT-FIRST JOURNEY SCREENS */}
+              {currentTab === 'journey-home' && (
+                <motion.div
+                  key="journey-home"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <JourneyHomeScreen user={user} onNavigate={setCurrentTab} />
+                </motion.div>
+              )}
+
+              {currentTab === 'journey-assessment' && (
+                <motion.div
+                  key="journey-assessment"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <HealthAssessmentScreen
+                    onNavigate={setCurrentTab}
+                    draftProfile={healthProfile}
+                    onProfileSaved={updateHealthProfile}
+                    onShowToast={showToast}
+                  />
+                </motion.div>
+              )}
+
+              {currentTab === 'journey-upload' && (
+                <motion.div
+                  key="journey-upload"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <UploadAnalyzeScreen onNavigate={setCurrentTab} />
+                </motion.div>
+              )}
+
+              {currentTab === 'journey-records' && (
+                <motion.div
+                  key="journey-records"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <PatientJourneyRecordsScreen onNavigate={setCurrentTab} />
+                </motion.div>
+              )}
+
+              {currentTab === 'journey-doctors' && (
+                <motion.div
+                  key="journey-doctors"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <ConnectDoctorScreen onNavigate={setCurrentTab} onShowToast={showToast} />
+                </motion.div>
+              )}
+
+              {currentTab === 'journey-appointments' && (
+                <motion.div
+                  key="journey-appointments"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <PatientJourneyAppointmentsScreen onNavigate={setCurrentTab} />
+                </motion.div>
+              )}
+
               {/* PATIENT SCREENS */}
               {currentTab === 'patient-home' && (
                 <motion.div
@@ -764,6 +869,18 @@ export default function App() {
                   transition={{ duration: 0.18 }}
                 >
                   <PatientEcgScreen onNavigate={setCurrentTab} />
+                </motion.div>
+              )}
+
+              {currentTab === 'patient-ecg-history' && (
+                <motion.div
+                  key="patient-ecg-history"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <PatientEcgHistoryScreen onNavigate={setCurrentTab} />
                 </motion.div>
               )}
 
@@ -860,6 +977,18 @@ export default function App() {
                 </motion.div>
               )}
 
+              {currentTab === 'doctor-ecg-records' && (
+                <motion.div
+                  key="doctor-ecg-records"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <DoctorPatientEcgDashboard onNavigate={setCurrentTab} initialPatientId={selectedDoctorPatientId} />
+                </motion.div>
+              )}
+
               {(currentTab === 'doctor-patients' || currentTab === 'patients') && (
                 <motion.div
                   key="doctor-patients"
@@ -884,8 +1013,6 @@ export default function App() {
                   transition={{ duration: 0.18 }}
                 >
                   <ECGAnalysisScreen
-                    onNavigateToQuantumLab={() => setCurrentTab('quantum-lab')}
-                    onNavigateToExplainability={() => setCurrentTab('explainability')}
                     onOpenAssistant={handleOpenAssistant}
                     onBookAppointment={() => setCurrentTab('patient-appointments')}
                     healthSummary={healthSummary}
@@ -921,104 +1048,6 @@ export default function App() {
                 </motion.div>
               )}
 
-              {/* SECONDARY ADVANCED RESEARCH SCREENS */}
-              {currentTab === 'overview' && (
-                <motion.div
-                  key="overview"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <OverviewScreen
-                    onNavigate={setCurrentTab}
-                    onOpenSettings={() => setIsSettingsOpen(true)}
-                    onOpenPatientProfile={() => setIsPatientProfileOpen(true)}
-                    onOpenNotifications={() => setIsNotificationsOpen(true)}
-                    onOpenHealthcareSupport={() => setIsHealthcareOpen(true)}
-                  />
-                </motion.div>
-              )}
-
-              {currentTab === 'dataset' && (
-                <motion.div
-                  key="dataset"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <DatasetScreen
-                    onNavigateToQuantumLab={() => setCurrentTab('quantum-lab')}
-                    onNavigateToAnalysis={() => setCurrentTab('ecg-analysis')}
-                    onNavigateToBenchmarks={() => setCurrentTab('benchmarks')}
-                    onNavigateToExperiments={() => setCurrentTab('experiments')}
-                  />
-                </motion.div>
-              )}
-
-              {currentTab === 'quantum-lab' && (
-                <motion.div
-                  key="quantum-lab"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <QuantumLabScreen
-                    onNavigateToAnalysis={() => setCurrentTab('ecg-analysis')}
-                    onNavigateToExplainability={() => setCurrentTab('explainability')}
-                    onNavigateToExperiments={() => setCurrentTab('experiments')}
-                  />
-                </motion.div>
-              )}
-
-              {currentTab === 'explainability' && (
-                <motion.div
-                  key="explainability"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <ExplainabilityScreen
-                    onNavigateToAnalysis={() => setCurrentTab('ecg-analysis')}
-                    onNavigateToBenchmarks={() => setCurrentTab('benchmarks')}
-                  />
-                </motion.div>
-              )}
-
-              {currentTab === 'benchmarks' && (
-                <motion.div
-                  key="benchmarks"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <BenchmarksScreen
-                    onNavigateToAnalysis={() => setCurrentTab('ecg-analysis')}
-                    onNavigateToQuantumLab={() => setCurrentTab('quantum-lab')}
-                  />
-                </motion.div>
-              )}
-
-              {currentTab === 'experiments' && (
-                <motion.div
-                  key="experiments"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <ExperimentsScreen
-                    onNavigateToQuantumLab={() => setCurrentTab('quantum-lab')}
-                    onNavigateToOverview={() => setCurrentTab('overview')}
-                    onNavigateToExplainability={() => setCurrentTab('explainability')}
-                    onNavigateToBenchmarks={() => setCurrentTab('benchmarks')}
-                  />
-                </motion.div>
-              )}
             </AnimatePresence>
           </div>
         </main>
@@ -1088,7 +1117,7 @@ export default function App() {
           isOpen={isNotificationsOpen}
           onClose={() => setIsNotificationsOpen(false)}
           onShowToast={showToast}
-          onViewAnalysis={() => setCurrentTab('benchmarks')}
+          onViewAnalysis={() => setCurrentTab('ecg-analysis')}
           onViewAppointment={() => setIsHealthcareOpen(true)}
         />
         {/* Ask Dr. Radar Core AI Assistant Modal */}

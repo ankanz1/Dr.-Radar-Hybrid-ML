@@ -59,6 +59,37 @@ export interface ModelInfoResponse {
   research_prototype: boolean;
 }
 
+export interface ECGSample {
+  id: string;
+  index: number;
+  class_id: number;
+  class_code: keyof Probabilities;
+  class_name: string;
+  signal: number[];
+}
+
+export interface ECGSamplesResponse {
+  samples: ECGSample[];
+}
+
+export interface EcgUploadMetadata {
+  format: string;
+  source: string;
+  original_sample_count: number;
+  generated_beat_count: number;
+  segmentation_method: string;
+  segmentation_note: string;
+  delimiter: string;
+}
+
+export interface EcgUploadResponse {
+  upload_id: string;
+  filename: string;
+  sample_count: number;
+  beats: number[][];
+  metadata: EcgUploadMetadata;
+}
+
 export class ECGAPIError extends Error {
   constructor(
     message: string,
@@ -98,6 +129,11 @@ export async function getModelInfo(): Promise<ModelInfoResponse> {
   return handleResponse<ModelInfoResponse>(response);
 }
 
+export async function getECGSamples(): Promise<ECGSamplesResponse> {
+  const response = await fetch(`${ECG_API_URL}/samples`);
+  return handleResponse<ECGSamplesResponse>(response);
+}
+
 export async function predictECG(ecg: number[]): Promise<PredictionResponse> {
   const response = await fetch(`${ECG_API_URL}/predict`, {
     method: 'POST',
@@ -114,4 +150,20 @@ export async function analyzeECG(ecg: number[]): Promise<AnalyzeResponse> {
     body: JSON.stringify({ ecg }),
   });
   return handleResponse<AnalyzeResponse>(response);
+}
+
+/**
+ * Upload a CSV/TXT ECG recording to POST /ecg/upload.
+ * The backend parses the numeric samples and returns deterministic contiguous
+ * 187-value segments. On any failure the error propagates — callers MUST NOT
+ * fall back to MIT-BIH samples when this fails.
+ */
+export async function uploadEcgFile(file: File): Promise<EcgUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(`${ECG_API_URL}/ecg/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+  return handleResponse<EcgUploadResponse>(response);
 }

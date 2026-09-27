@@ -585,7 +585,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                     </button>
                     <button
                       onClick={() => onUpdateRole('researcher')}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                      className={`hidden px-2.5 py-1 rounded-lg text-xs font-bold ${
                         user.role === 'researcher' ? 'bg-[#bc000a] text-white' : 'bg-white border border-slate-200 text-slate-600'
                       }`}
                     >

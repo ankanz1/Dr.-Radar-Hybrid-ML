@@ -1,3 +1,4 @@
+// Retained for backward compatibility with persisted accounts; the UI no longer exposes this role.
 export type UserRole = 'patient' | 'doctor' | 'researcher';
 
 export type ProfilePictureType = 'uploaded' | 'avatar' | 'none';
@@ -65,17 +66,26 @@ export type ScreenTab =
   | 'alerts'
   | 'health-info'
   | 'medical-records'
+  // Patient-first journey (new simplified flow)
+  | 'journey-home'
+  | 'journey-assessment'
+  | 'journey-upload'
+  | 'journey-records'
+  | 'journey-doctors'
+  | 'journey-appointments'
   // Direct / Legacy Mappings for seamless compatibility
   | 'patient-home'
   | 'patient-ecg'
+  | 'patient-ecg-history'
   | 'patient-results'
   | 'patient-appointments'
   | 'patient-profile'
   | 'doctor-dashboard'
   | 'doctor-patients'
+  | 'doctor-ecg-records'
   | 'doctor-alerts'
   | 'doctor-reports'
-  // Secondary Advanced Research Area
+  // Retained for legacy deep links; no researcher navigation renders these screens.
   | 'overview'
   | 'dataset'
   | 'quantum-lab'

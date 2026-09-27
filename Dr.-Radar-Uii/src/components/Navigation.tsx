@@ -38,7 +38,8 @@ export const Navigation = ({
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
   const [isResearchSectionOpen, setIsResearchSectionOpen] = useState(false);
 
-  // PATIENT Primary Navigation: Home, Analysis, Results, Appointments, Profile
+  // PATIENT Primary Navigation (patient-first journey): Home, Health, Records,
+  // Doctors, Appointments. Profile/settings remain secondary (footer + top bar).
   const patientNavItems: {
     id: ScreenTab;
     label: string;
@@ -48,41 +49,39 @@ export const Navigation = ({
     matchTabs?: ScreenTab[];
   }[] = [
     {
-      id: 'patient-home',
+      id: 'journey-home',
       label: 'Home',
       icon: 'home',
-      description: 'Status, latest ECG & next steps',
-      matchTabs: ['patient-home', 'home'],
+      description: 'How is your health today?',
+      matchTabs: ['journey-home', 'patient-home', 'home'],
     },
     {
-      id: 'analysis',
-      label: 'Analysis',
-      icon: 'vital_signs',
-      badge: 'Cardiology Ready',
-      description: 'Cardiology, imaging & chronic care',
-      matchTabs: ['analysis', 'patient-ecg', 'ecg-analysis', 'reusable-analysis'],
+      id: 'journey-assessment',
+      label: 'Health',
+      icon: 'health_and_safety',
+      description: 'Assessment & health context',
+      matchTabs: ['journey-assessment', 'health-info'],
     },
     {
-      id: 'patient-results',
-      label: 'Results',
-      icon: 'description',
-      badge: 'Reports',
-      description: 'Diagnostic archives & trends',
-      matchTabs: ['patient-results', 'results'],
+      id: 'journey-upload',
+      label: 'Records',
+      icon: 'cloud_upload',
+      description: 'Upload & analyze a record',
+      matchTabs: ['journey-upload', 'journey-records', 'patient-ecg', 'patient-ecg-history', 'medical-records'],
     },
     {
-      id: 'patient-appointments',
+      id: 'journey-doctors',
+      label: 'Doctors',
+      icon: 'stethoscope',
+      description: 'Connect & book a doctor',
+      matchTabs: ['journey-doctors'],
+    },
+    {
+      id: 'journey-appointments',
       label: 'Appointments',
       icon: 'calendar_today',
-      description: 'Care team consultations',
-      matchTabs: ['patient-appointments'],
-    },
-    {
-      id: 'patient-profile',
-      label: 'Profile',
-      icon: 'person',
-      description: 'Medical ID & sensors',
-      matchTabs: ['patient-profile', 'profile', 'health-info', 'medical-records'],
+      description: 'Consultations & care team',
+      matchTabs: ['journey-appointments', 'patient-appointments'],
     },
   ];
 
@@ -108,7 +107,7 @@ export const Navigation = ({
       icon: 'groups',
       badge: '142',
       description: 'Cohort charts, beats & records',
-      matchTabs: ['doctor-patients', 'patients'],
+      matchTabs: ['doctor-patients', 'patients', 'doctor-ecg-records'],
     },
     {
       id: 'analysis',
@@ -212,7 +211,7 @@ export const Navigation = ({
                 </span>
               </div>
               <p className="text-[10.5px] font-semibold text-[#5c7b99] tracking-tight leading-tight mt-0.5">
-                Hybrid Quantum–Classical Healthcare Intelligence
+                
               </p>
             </div>
           </div>
@@ -228,8 +227,8 @@ export const Navigation = ({
                   : 'text-slate-600 hover:text-[#101c28]'
               }`}
             >
-              <span className="material-symbols-outlined text-[14px]">person</span>
-              Patient
+              <span className="material-symbols-outlined text-[10px]">person</span>
+              
             </button>
             <button
               id="role-switch-doctor"
@@ -240,20 +239,8 @@ export const Navigation = ({
                   : 'text-slate-600 hover:text-[#101c28]'
               }`}
             >
-              <span className="material-symbols-outlined text-[14px]">stethoscope</span>
-              Doctor
-            </button>
-            <button
-              id="role-switch-researcher"
-              onClick={() => onRoleChange('researcher')}
-              className={`flex-1 py-1.5 px-1.5 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                userRole === 'researcher'
-                  ? 'bg-white text-[#bc000a] shadow-xs'
-                  : 'text-slate-600 hover:text-[#101c28]'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[14px]">science</span>
-              Research
+              <span className="material-symbols-outlined text-[10px]">stethoscope</span>
+              
             </button>
           </div>
         </div>
@@ -386,8 +373,8 @@ export const Navigation = ({
                 );
               })}
 
-              {/* Collapsible Research & Advanced Tools Section */}
-              <div className="pt-3">
+              {/* Research navigation removed. */}
+              <div className="hidden">
                 <button
                   onClick={() => setIsResearchSectionOpen(!isResearchSectionOpen)}
                   className="w-full px-3 py-1.5 flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 hover:text-slate-700 transition-colors"
@@ -933,7 +920,7 @@ export const Navigation = ({
                     onRoleChange('researcher');
                     setIsMobileMoreOpen(false);
                   }}
-                  className={`flex-1 py-1.5 px-1.5 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
+                  className={`hidden flex-1 py-1.5 px-1.5 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition-all ${
                     userRole === 'researcher'
                       ? 'bg-white text-[#bc000a] shadow-xs'
                       : 'text-slate-600'
@@ -964,8 +951,8 @@ export const Navigation = ({
                 </button>
               </div>
 
-              {/* Advanced Research Views */}
-              <div className="space-y-2">
+              {/* Research navigation removed. */}
+              <div className="hidden">
                 <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
                   Research / Model Insights
                 </span>

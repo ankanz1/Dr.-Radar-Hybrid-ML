@@ -62,3 +62,4 @@ ptbdb_normal.csv
 *.swp
 .DS_Store
 Thumbs.db
+.vercel

@@ -1,0 +1,16 @@
+pandas==3.0.5
+numpy==2.5.3
+scikit-learn==1.9.1
+torch==2.14.0+cpu
+joblib==1.4.0
+pennylane==0.45.1
+pennylane-lightning==0.45.0
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+PyMuPDF==1.26.7
+opencv-python-headless==4.13.0.92
+argon2-cffi==25.1.0
+SQLAlchemy==2.0.54
+matplotlib==3.10.8
+psycopg2-binary==2.9.10
+python-multipart==0.0.20

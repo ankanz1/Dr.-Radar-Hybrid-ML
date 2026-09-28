@@ -28,24 +28,11 @@ export const PatientHomeScreen: React.FC<PatientHomeScreenProps> = ({
   const [activeReportModal, setActiveReportModal] = useState<any | null>(null);
   const [previewAbnormalRec, setPreviewAbnormalRec] = useState(false);
 
-  // Latest ECG Context for Ask Dr. Radar
+  // Ask Dr. Radar entry context. Step 2: no hardcoded/demo identity or
+  // fabricated ECG values — real record context retrieval comes in Step 3.
   const latestEcgContext: AssistantContext = {
-    type: 'ecg',
-    title: 'ECG Telemetry (Lead II)',
-    subtitle: 'Analyzed Today • 2:15 PM',
-    sampleId: 'ECG-0248',
-    patientName: 'Ashton Miller',
-    patientId: 'PT-9042',
-    prediction: 'Normal Sinus Rhythm',
-    confidence: '98.4%',
-    heartRate: 72,
-    aamiClass: 'N',
-    intervals: {
-      prMs: 156,
-      qrsMs: 88,
-      qtMs: 390,
-    },
-    findings: 'Conduction intervals are regular and physiological. No ventricular ectopy or ischemic ST deviation detected.',
+    type: 'general',
+    title: 'Patient Home — Ask Dr. Radar',
   };
 
   // Recent results list representing patient's verified test records

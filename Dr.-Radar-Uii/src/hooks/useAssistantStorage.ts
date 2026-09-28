@@ -2,12 +2,29 @@ import { useState, useEffect, useCallback } from 'react';
 import { ConversationSession, AssistantMessage, AssistantContext } from '../types/assistant';
 import { UserRole } from '../types';
 
-const STORAGE_KEY = 'dr_radar_assistant_sessions';
+/**
+ * Assistant conversation storage — scoped per authenticated Supabase user.
+ *
+ * Step 2 fix: the key is `dr_radar_assistant_sessions:<supabase-user-id>`, so
+ * two accounts on the same browser never see each other's conversations.
+ * Access tokens are NEVER stored here (or anywhere client-persistent); the
+ * token lives only in the in-memory Supabase session. When no user id is
+ * provided (signed out), the hook exposes no sessions and cannot persist.
+ */
 
-export function useAssistantStorage(defaultRole: UserRole = 'patient') {
+const STORAGE_KEY_PREFIX = 'dr_radar_assistant_sessions';
+
+export function assistantStorageKey(userId: string | null | undefined): string {
+  return userId ? `${STORAGE_KEY_PREFIX}:${userId}` : '';
+}
+
+export function useAssistantStorage(userId: string | null | undefined, defaultRole: UserRole = 'patient') {
+  const storageKey = assistantStorageKey(userId);
+
   const [sessions, setSessions] = useState<ConversationSession[]>(() => {
+    if (!storageKey) return [];
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
         return JSON.parse(saved);
       }
@@ -21,14 +38,32 @@ export function useAssistantStorage(defaultRole: UserRole = 'patient') {
     return sessions.length > 0 ? sessions[0].id : null;
   });
 
-  // Sync to local storage whenever sessions change
+  // Reload when the authenticated user changes (account switch on one browser)
   useEffect(() => {
+    if (!storageKey) {
+      setSessions([]);
+      setActiveSessionId(null);
+      return;
+    }
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+      const saved = localStorage.getItem(storageKey);
+      setSessions(saved ? JSON.parse(saved) : []);
+    } catch (e) {
+      console.error('Failed to load assistant sessions:', e);
+      setSessions([]);
+    }
+    setActiveSessionId(null);
+  }, [storageKey]);
+
+  // Sync to local storage whenever sessions change (never without a user scope)
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(sessions));
     } catch (e) {
       console.error('Failed to save assistant sessions to localStorage:', e);
     }
-  }, [sessions]);
+  }, [sessions, storageKey]);
 
   // Create a new session
   const createNewSession = useCallback(
@@ -51,7 +86,7 @@ export function useAssistantStorage(defaultRole: UserRole = 'patient') {
         }
       }
 
-      // Initial welcome message
+      // Initial welcome message (no hardcoded identities)
       const welcomeText =
         role === 'doctor'
           ? `Welcome to **Ask Dr. Radar** clinical decision support.\n\nI can help summarize patient telemetry, correlate 5-class AAMI predictions with baseline records, and draft clinical review documentation. ${
@@ -59,7 +94,7 @@ export function useAssistantStorage(defaultRole: UserRole = 'patient') {
             }`
           : role === 'researcher'
           ? `Welcome to **Ask Dr. Radar** researcher intelligence.\n\nI can explain the hybrid quantum-classical pipeline, information bottleneck layer, 10-qubit VQC ansatz, and ablation benchmarks.`
-          : `Hello Ashton, I'm **Dr. Radar AI**.\n\nI can help you understand your health measurements, explain medical terms, and review your Dr. Radar test results in simple, plain language.\n\n*Remember: I am an AI healthcare assistant and cannot diagnose or prescribe. Always consult your doctor for medical advice.*`;
+          : `Hello! I'm **Dr. Radar AI**.\n\nI can help you understand your health measurements, explain medical terms, and review your Dr. Radar test results in simple, plain language.\n\n*Remember: I am an AI healthcare assistant and cannot diagnose or prescribe. Always consult your doctor for medical advice.*`;
 
       const initialMessage: AssistantMessage = {
         id: `msg-${Date.now()}`,
@@ -157,16 +192,17 @@ export function useAssistantStorage(defaultRole: UserRole = 'patient') {
     );
   }, []);
 
-  // Clear all sessions
+  // Clear all sessions (only ever touches the CURRENT user's scope)
   const clearAllSessions = useCallback(() => {
     setSessions([]);
     setActiveSessionId(null);
+    if (!storageKey) return;
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(storageKey);
     } catch {
       // ignore
     }
-  }, []);
+  }, [storageKey]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null;
 

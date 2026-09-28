@@ -83,6 +83,13 @@ export const Navigation = ({
       description: 'Consultations & care team',
       matchTabs: ['journey-appointments', 'patient-appointments'],
     },
+    {
+      id: 'journey-messages',
+      label: 'Messages',
+      icon: 'chat',
+      description: 'Chat with your doctor',
+      matchTabs: ['journey-messages'],
+    },
   ];
 
   // DOCTOR Primary Navigation: Dashboard, Patients, Analysis, Alerts, Reports
@@ -131,6 +138,13 @@ export const Navigation = ({
       icon: 'description',
       description: 'Physician sign-offs & dossiers',
       matchTabs: ['doctor-reports', 'reports'],
+    },
+    {
+      id: 'doctor-messages',
+      label: 'Messages',
+      icon: 'chat',
+      description: 'Patient appointment chats',
+      matchTabs: ['doctor-messages'],
     },
   ];
 

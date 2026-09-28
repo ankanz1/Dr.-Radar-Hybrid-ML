@@ -21,6 +21,8 @@ import { saveJourneyResume, clearJourneyResume } from '../services/journeyState'
 
 interface PatientJourneyAppointmentsScreenProps {
   onNavigate: (tab: ScreenTab) => void;
+  /** Opens the chat screen scoped to THIS appointment (card Chat button). */
+  onOpenChat?: (appointmentId: string) => void;
 }
 
 type AppointmentsState =
@@ -47,7 +49,7 @@ const STATUS_META: Record<AppointmentView['status'], { label: string; className:
   no_show: { label: 'Missed', className: 'bg-amber-50 text-amber-800 border-amber-200' },
 };
 
-export const PatientJourneyAppointmentsScreen: React.FC<PatientJourneyAppointmentsScreenProps> = ({ onNavigate }) => {
+export const PatientJourneyAppointmentsScreen: React.FC<PatientJourneyAppointmentsScreenProps> = ({ onNavigate, onOpenChat }) => {
   const [state, setState] = useState<AppointmentsState>({ phase: 'loading' });
 
   useEffect(() => {
@@ -169,6 +171,21 @@ export const PatientJourneyAppointmentsScreen: React.FC<PatientJourneyAppointmen
                   consultation. Your doctor can see the analysis and records you shared through Dr. Radar.
                 </p>
               </div>
+
+              {/* Chat action: opens the appointment-scoped conversation for THIS card */}
+              <div>
+                <button
+                  id={`appointment-chat-${appointment.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation(); // cards are not clickable, but never bubble a card-level action
+                    if (onOpenChat) onOpenChat(appointment.id);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#bc000a] text-white text-xs font-bold hover:bg-[#a00008] cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[15px]">chat</span>
+                  Chat
+                </button>
+              </div>
             </article>
           ))}
         </section>
@@ -185,9 +202,22 @@ export const PatientJourneyAppointmentsScreen: React.FC<PatientJourneyAppointmen
                   <p className="text-xs font-bold text-[#101c28] truncate">{appointment.doctorName}</p>
                   <p className="text-[11px] text-slate-500 font-mono">{formatDateTime(appointment.startTime)}</p>
                 </div>
-                <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border shrink-0 ${STATUS_META[appointment.status].className}`}>
-                  {STATUS_META[appointment.status].label}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${STATUS_META[appointment.status].className}`}>
+                    {STATUS_META[appointment.status].label}
+                  </span>
+                  <button
+                    id={`appointment-chat-${appointment.id}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (onOpenChat) onOpenChat(appointment.id);
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#bc000a] text-white text-[10.5px] font-bold hover:bg-[#a00008] cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">chat</span>
+                    Chat
+                  </button>
+                </div>
               </div>
             ))}
           </div>

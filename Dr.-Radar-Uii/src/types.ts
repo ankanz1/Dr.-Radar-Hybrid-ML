@@ -73,6 +73,7 @@ export type ScreenTab =
   | 'journey-records'
   | 'journey-doctors'
   | 'journey-appointments'
+  | 'journey-messages'
   // Direct / Legacy Mappings for seamless compatibility
   | 'patient-home'
   | 'patient-ecg'
@@ -85,6 +86,7 @@ export type ScreenTab =
   | 'doctor-ecg-records'
   | 'doctor-alerts'
   | 'doctor-reports'
+  | 'doctor-messages'
   // Retained for legacy deep links; no researcher navigation renders these screens.
   | 'overview'
   | 'dataset'

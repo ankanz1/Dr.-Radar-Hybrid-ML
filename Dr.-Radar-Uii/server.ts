@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { extractBearerToken, verifySupabaseToken } from "./server/auth";
 
 dotenv.config();
 
@@ -31,10 +32,24 @@ function getGenAI(): GoogleGenAI | null {
   return genAIClient;
 }
 
-// Medical Assistant API Route
+// Medical Assistant API Route — authenticated (Supabase JWT required).
 app.post("/api/assistant/chat", async (req, res) => {
+  // --- Auth gate: missing/malformed tokens are rejected before anything else. ---
+  const token = extractBearerToken(req.headers.authorization);
+  if (!token) {
+    return res.status(401).json({ error: "Sign in to use Dr. Radar Assistant." });
+  }
+  const verified = await verifySupabaseToken(token);
+  if (verified.status !== "ok") {
+    return res.status(401).json({ error: "Sign in to use Dr. Radar Assistant." });
+  }
+  const authUser = verified.user;
+
   try {
-    const { message, role, context, history } = req.body;
+    const { message, context, history } = req.body;
+    // The role is NEVER taken from the request body — it is resolved from the
+    // caller's own public.users row (or token metadata) in verifySupabaseToken.
+    const role = authUser.role;
 
     if (!message || typeof message !== "string") {
       return res.status(400).json({ error: "Message is required" });
@@ -48,9 +63,21 @@ app.post("/api/assistant/chat", async (req, res) => {
       });
     }
 
-    const userRole = role || "patient";
+    // Server-resolved role (database/token-metadata). "unknown" stays unknown:
+    // no patient default, no client-asserted value, no demo identity.
+    const userRole = role || "unknown";
     const contextPrompt = context
-      ? `\nCURRENT DR. RADAR ACTIVE CONTEXT:\n- Type: ${context.type || "health record"}\n- Title: ${context.title || "Biomedical telemetry"}\n- Sample ID: ${context.sampleId || "N/A"}\n- Patient Name: ${context.patientName || "Ashton"}\n- Prediction: ${context.prediction || "N/A"}\n- Confidence: ${context.confidence || "N/A"}\n- Heart Rate: ${context.heartRate ? context.heartRate + " BPM" : "N/A"}\n- AAMI Code: ${context.aamiClass || "N/A"}\n- Intervals: PR=${context.intervals?.prMs || "N/A"}ms, QRS=${context.intervals?.qrsMs || "N/A"}ms\n- Clinical Findings: ${context.findings || context.clinicalNotes || "N/A"}\n`
+      ? `\nCURRENT DR. RADAR ACTIVE CONTEXT (client-attached, unverified):
+- Type: ${context.type || "health record"}
+- Title: ${context.title || "Biomedical telemetry"}
+- Sample ID: ${context.sampleId || "N/A"}
+- Prediction: ${context.prediction || "N/A"}
+- Confidence: ${context.confidence || "N/A"}
+- Heart Rate: ${context.heartRate ? context.heartRate + " BPM" : "N/A"}
+- AAMI Code: ${context.aamiClass || "N/A"}
+- Intervals: PR=${context.intervals?.prMs || "N/A"}ms, QRS=${context.intervals?.qrsMs || "N/A"}ms
+- Clinical Findings: ${context.findings || context.clinicalNotes || "N/A"}
+`
       : "\nNo specific test context attached. User is asking a general health/platform question.\n";
 
     const systemInstruction = `You are Dr. Radar AI — the integrated healthcare intelligence assistant for Dr. Radar: Hybrid Quantum–Classical Healthcare Intelligence.
@@ -82,18 +109,20 @@ CRITICAL SAFETY & POSITIONING MANDATES:
    If information is not available in the records, say: "I don't have enough information from your Dr. Radar records to answer that reliably."
    Never fabricate or hallucinate patient test numbers.
 
-ROLE ADAPTATION:
-- If user is a PATIENT (role="${userRole}"):
+ROLE ADAPTATION (the authenticated role resolved server-side is: "${userRole}"):
+- If the role is "patient":
   Communicate in empathetic, clear, doctor-like but accessible plain language. Avoid dense medical jargon without explaining it. Structure your response into readable short sections:
   **WHAT IT MEANS**
   **WHY IT MATTERS**
   **WHAT DR. RADAR FOUND**
   **WHAT YOU CAN DISCUSS WITH YOUR DOCTOR**
-- If user is a DOCTOR (role="doctor"):
+- If the role is "doctor":
   Provide advanced clinical decision support, summary of telemetry, trend analysis, differential considerations, and end with the explicit disclaimer:
   "AI-generated summary — review before clinical use."
-- If user is a RESEARCHER (role="researcher"):
+- If the role is "researcher":
   Explain hybrid quantum-classical architecture, 10-qubit parameterized VQC ansatz, information bottleneck feature contraction, Pauli-Z expectations, and benchmark metrics.
+- If the role is "unknown":
+  Use neutral, role-agnostic language. Do not assume the user is a patient or a clinician; provide general health information only.
 
 ${contextPrompt}`;
 

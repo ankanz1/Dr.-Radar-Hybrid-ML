@@ -11,6 +11,8 @@ import { UploadAnalyzeScreen } from './components/UploadAnalyzeScreen';
 import { PatientJourneyRecordsScreen } from './components/PatientJourneyRecordsScreen';
 import { ConnectDoctorScreen } from './components/ConnectDoctorScreen';
 import { PatientJourneyAppointmentsScreen } from './components/PatientJourneyAppointmentsScreen';
+import { AppointmentChatScreen } from './components/AppointmentChatScreen';
+import { DoctorMessagesScreen } from './components/DoctorMessagesScreen';
 import { PatientHomeScreen } from './components/PatientHomeScreen';
 import { PatientEcgScreen } from './components/PatientEcgScreen';
 import { PatientEcgHistoryScreen } from './components/PatientEcgHistoryScreen';
@@ -85,6 +87,9 @@ export default function App() {
     user.role === 'doctor' ? 'doctor-dashboard' : 'journey-home'
   );
   const [selectedDoctorPatientId, setSelectedDoctorPatientId] = useState<string | null>(null);
+  // Deep-link appointment for the patient chat (set by an appointment card's Chat button;
+  // cleared when the patient opens Messages from normal navigation).
+  const [chatAppointmentId, setChatAppointmentId] = useState<string | null>(null);
   const [selectedModalityTestId, setSelectedModalityTestId] = useState<string>('imaging-cxr');
   const [activeReportModal, setActiveReportModal] = useState<Partial<HistoryReport> | null>(null);
   const [globalToast, setGlobalToast] = useState<{ message: string; type?: 'success' | 'info' | 'warning' } | null>(null);
@@ -261,6 +266,12 @@ const handleCompleteOnboarding = async (
       icon: 'calendar_today',
       badge: 'Care Team',
     },
+    'journey-messages': {
+      title: 'Messages',
+      subtitle: 'Chat with your doctor about an appointment',
+      icon: 'chat',
+      badge: 'Care Team',
+    },
     'patient-home': {
       title: 'Heart Health Overview',
       subtitle: 'Daily telemetry summary, rhythm stability status, and next actions',
@@ -347,6 +358,12 @@ const handleCompleteOnboarding = async (
       icon: 'description',
       badge: 'Physician Sign-Off',
     },
+    'doctor-messages': {
+      title: 'Patient Messages',
+      subtitle: 'Appointment-scoped conversations with your patients',
+      icon: 'chat',
+      badge: 'Care Team',
+    },
 
   };
 
@@ -372,7 +389,12 @@ const handleCompleteOnboarding = async (
       {/* Navigation (Desktop Left Sidebar + Mobile Bottom Bar) */}
       <Navigation
         currentTab={currentTab}
-        onTabChange={setCurrentTab}
+        onTabChange={(tab) => {
+          // Opening Messages from normal navigation (nav item/bottom bar) clears
+          // any card Chat deep-link so the default conversation selection applies.
+          if (tab === 'journey-messages') setChatAppointmentId(null);
+          setCurrentTab(tab);
+        }}
         userRole={userRole}
         onRoleChange={handleRoleChange}
         user={user}
@@ -832,7 +854,29 @@ const handleCompleteOnboarding = async (
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.18 }}
                 >
-                  <PatientJourneyAppointmentsScreen onNavigate={setCurrentTab} />
+                  <PatientJourneyAppointmentsScreen
+                    onNavigate={setCurrentTab}
+                    onOpenChat={(appointmentId) => {
+                      setChatAppointmentId(appointmentId);
+                      setCurrentTab('journey-messages');
+                    }}
+                  />
+                </motion.div>
+              )}
+
+              {currentTab === 'journey-messages' && (
+                <motion.div
+                  key="journey-messages"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <AppointmentChatScreen
+                    key={chatAppointmentId ?? 'chat-default'}
+                    onNavigate={setCurrentTab}
+                    initialAppointmentId={chatAppointmentId}
+                  />
                 </motion.div>
               )}
 
@@ -1032,6 +1076,23 @@ const handleCompleteOnboarding = async (
                   <DoctorAlertsScreen
                     onNavigate={setCurrentTab}
                     onSelectPatient={(id) => setSelectedDoctorPatientId(id)}
+                  />
+                </motion.div>
+              )}
+
+              {currentTab === 'doctor-messages' && (
+                <motion.div
+                  key="doctor-messages"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <DoctorMessagesScreen
+                    onOpenPatient={(patientId) => {
+                      setSelectedDoctorPatientId(patientId);
+                      setCurrentTab('doctor-ecg-records');
+                    }}
                   />
                 </motion.div>
               )}

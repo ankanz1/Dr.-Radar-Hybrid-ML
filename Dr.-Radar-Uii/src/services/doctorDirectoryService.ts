@@ -75,6 +75,33 @@ export async function fetchDoctorDirectory(): Promise<DoctorDirectoryResult> {
   return { ok: true, doctors };
 }
 
+/**
+ * Resolve doctor display names for the given doctor ids through the SAME
+ * authorized migration-011 RPC the directory screen uses (public directory
+ * columns only — no health data, no RLS bypass). Used by the patient chat to
+ * label conversations, because under RLS the patient cannot read the raw
+ * doctors/users rows the appointment embed points at.
+ */
+export async function fetchDoctorNamesByIds(
+  doctorIds: string[]
+): Promise<Record<string, string>> {
+  if (doctorIds.length === 0) return {};
+  const { data, error } = await supabase.rpc('list_doctor_directory');
+  if (error || !data) {
+    // Non-fatal: callers keep their generic fallback label.
+    return {};
+  }
+  const wanted = new Set(doctorIds);
+  const names: Record<string, string> = {};
+  for (const row of data as Array<Record<string, unknown>>) {
+    const id = row.doctor_id as string;
+    if (wanted.has(id)) {
+      names[id] = String(row.display_name ?? '').trim();
+    }
+  }
+  return names;
+}
+
 export interface AppointmentView {
   id: string;
   doctorId: string;

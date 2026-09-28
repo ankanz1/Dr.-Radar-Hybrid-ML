@@ -8,6 +8,7 @@ import {
 import { useAssistantStorage } from '../../hooks/useAssistantStorage';
 import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { askAssistantChat } from '../../services/clinicalAssistantEngine';
+import { supabase } from '../../lib/supabase';
 import { AssistantContextDrawer } from './AssistantContextDrawer';
 import { AssistantPrivacyModal } from './AssistantPrivacyModal';
 import { AboutDrRadarAIModal } from './AboutDrRadarAIModal';
@@ -34,6 +35,22 @@ export const AskDrRadarModal: React.FC<AskDrRadarModalProps> = ({
   user,
   healthSummary,
 }) => {
+  // Authenticated Supabase session — the ONLY identity source for the assistant.
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      setSessionUserId(data.session?.user?.id ?? null);
+      setSessionChecked(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
   const {
     sessions,
     activeSessionId,
@@ -44,7 +61,9 @@ export const AskDrRadarModal: React.FC<AskDrRadarModalProps> = ({
     deleteSession,
     renameSession,
     clearAllSessions,
-  } = useAssistantStorage(userRole);
+  } = useAssistantStorage(sessionUserId, userRole);
+
+  const isSignedOut = sessionChecked && !sessionUserId;
 
   const [inputMessage, setInputMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -94,6 +113,31 @@ export const AskDrRadarModal: React.FC<AskDrRadarModalProps> = ({
   }, [activeSession?.messages, isLoading, voiceState]);
 
   if (!isOpen) return null;
+
+  // Signed-out gate: no session -> no assistant. No fabricated content,
+  // no Gemini call, no local fake responses.
+  if (isSignedOut) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0c1926]/60 backdrop-blur-sm">
+        <div className="w-full max-w-sm bg-white rounded-3xl p-8 text-center space-y-4 shadow-2xl border border-slate-200/90">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-[#ffe8e8] text-[#bc000a] flex items-center justify-center">
+            <span className="material-symbols-outlined text-[26px]">lock</span>
+          </div>
+          <h3 className="text-base font-extrabold text-[#101c28]">Sign in required</h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Please sign in to use Dr. Radar Assistant. Your conversations are private to your account.
+          </p>
+          <button
+            id="assistant-sign-in-close"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-[#bc000a] text-white text-xs font-bold hover:bg-[#a00008] cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Active conversation context
   const currentContext: AssistantContext | null =
@@ -194,10 +238,15 @@ export const AskDrRadarModal: React.FC<AskDrRadarModalProps> = ({
 
       addMessage(sessionId, assistantMessage);
     } catch (err: any) {
+      // Honest failure text from the engine (sign-in required / temporarily
+      // unavailable). Never a fabricated clinical response.
       const errorMessage: AssistantMessage = {
         id: `err-${Date.now()}`,
         sender: 'assistant',
-        text: 'I apologize, but I encountered a temporary processing issue. Please feel free to retry your question, or consult your healthcare provider.',
+        text:
+          err?.code === 'signed-out'
+            ? 'Please sign in to use Dr. Radar Assistant.'
+            : err?.message || 'Dr. Radar Assistant is temporarily unavailable. Please try again.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isError: true,
       };

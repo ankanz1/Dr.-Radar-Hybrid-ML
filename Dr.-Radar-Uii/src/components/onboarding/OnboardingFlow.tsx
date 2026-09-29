@@ -76,35 +76,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const [specialization, setSpecialization] = useState(user.specialization || 'Cardiology');
   const [organization, setOrganization] = useState(user.organization || 'General Medical Institute');
 
-  // Temporary development diagnostics for OAuth — never log tokens/secrets.
-  const logOAuth = (message: string, details?: Record<string, unknown>) => {
-    if (import.meta.env.DEV) {
-      console.log(`[onboarding:oauth] ${message}`, details ?? '');
-    }
-  };
-
-  const startOAuth = async (provider: 'google' | 'facebook') => {
-    setAuthError(null);
-    logOAuth(`initiating ${provider} sign-in`, {
-      provider,
-      redirectTo: window.location.origin,
-    });
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: window.location.origin },
-    });
-    if (error) {
-      // Surface the error — never swallow it.
-      logOAuth(`${provider} signInWithOAuth failed`, {
-        code: error.code ?? null,
-        message: error.message,
-        status: error.status ?? null,
-      });
-      setAuthError(`${provider} sign-in failed: ${error.message}`);
-    }
-    // On success the browser is redirected to the provider — nothing else to do here.
-  };
-
   const handleFileUpload = (file: File) => {
     setUploadError(null);
     if (!file.type.startsWith('image/')) {
@@ -627,41 +598,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
                 >
                   Sign In
                 </button>
-              </div>
-
-              {/* Social Authentication */}
-              <div className="mt-4 space-y-2">
-                <span className="text-xs text-slate-500 font-medium text-center">OR CONTINUE WITH</span>
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void startOAuth('google');
-                    }}
-                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer w-full sm:w-48 border border-slate-200/80 bg-white hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[#bc000a]/20 focus-visible:ring-offset-2,disabled:opacity-50 disabled:pointer-events-none`}
-                  >
-                    <img
-                      src="/google.png"
-                      alt="Google"
-                      className="flex-shrink-0 w-5 h-5 object-contain"
-                    />
-                    <span className="hidden sm:inline">Continue with Google</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void startOAuth('facebook');
-                    }}
-                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer w-full sm:w-48 border border-slate-200/80 bg-white hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-[#bc000a]/20 focus-visible:ring-offset-2,disabled:opacity-50 disabled:pointer-events-none`}
-                  >
-                    <img
-                      src="/facebook.png"
-                      alt="Facebook"
-                      className="flex-shrink-0 w-5 h-5 object-contain"
-                    />
-                    <span className="hidden sm:inline">Continue with Facebook</span>
-                  </button>
-                </div>
               </div>
 
               {authError && (

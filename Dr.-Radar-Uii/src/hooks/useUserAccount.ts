@@ -65,11 +65,16 @@ export function useUserAccount() {
     return DEFAULT_USER;
   });
 
-  // Supabase session state — source of truth for authentication
+  // Supabase session state — source of truth for authentication.
+  // null  = session not yet known (getSession() in flight) — no routing decisions.
+  // { user: null } = known signed-out. { user: {...} } = known signed-in.
   const [supabaseSession, setSupabaseSession] = useState<
     | { user: { id: string; email: string } | null }
     | null
   >(null);
+  // False until the initial getSession() resolves; blocks "signed-out" UI
+  // decisions (which read the localStorage ghost account) from racing auth.
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
     try {
@@ -146,7 +151,11 @@ export function useUserAccount() {
         displayName: draft.displayName,
       });
       if (cancelled) return;
-      if (!result.ok && import.meta.env.DEV) {
+      if (!result.ok) {
+        // Honest failure: provisioning errors are surfaced (dev + prod) but do
+        // NOT sign the user out and do NOT clear auth state — Supabase Auth is
+        // the source of truth and the session stands. The DB-derived onboarding
+        // state below still applies when the row is readable.
         console.error('[account] login-time provisioning failed:', result.message);
       }
 
@@ -186,24 +195,30 @@ export function useUserAccount() {
   // Update onboarding state when Supabase session changes
   // (e.g., after email-confirmation redirect, the session becomes available)
   useEffect(() => {
+    // sessionLoaded gate: before the initial getSession() resolves we cannot
+    // know whether the visitor is signed in. The "signed-out" branch below
+    // reads localStorage, which the persist effect has already seeded with    // DEFAULT_USER (onboardingCompleted: true) — trusting it pre-auth produced    // the ghost dashboard: every fresh visitor landed past onboarding. Wait    // until the session is KNOWN before deciding anything.
+    if (!sessionLoaded) return;
     // Run only when there is **no** active Supabase session. This prevents stale
     // localStorage onboarding data from overwriting the DB‑derived onboarding state
     // after a successful OAuth login.
     if (!supabaseSession) {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
-        if (!stored) {
-          // No local onboarding state — start onboarding from the beginning
+        const parsed = stored ? (JSON.parse(stored) as Partial<UserAccountState>) : null;
+        // Ghost-account guard: the persist effect seeds localStorage with
+        // DEFAULT_USER (onboardingCompleted: true, email: '') on mount, so a
+        // stored "completed" account with NO email is not a real local account.
+        // A signed-out visitor without a real account identity must always see
+        // onboarding (auth screen), never a phantom dashboard.
+        if (!parsed?.email) {
+          setIsOnboardingActive(true);
+        } else if (!parsed.onboardingCompleted) {
+          // Onboarding not yet completed — continue the existing onboarding flow
           setIsOnboardingActive(true);
         } else {
-          const parsed = JSON.parse(stored);
-          if (!parsed.onboardingCompleted) {
-            // Onboarding not yet completed — continue the existing onboarding flow
-            setIsOnboardingActive(true);
-          } else {
-            // Onboarding already completed — do not restart onboarding
-            setIsOnboardingActive(false);
-          }
+          // Onboarding already completed — do not restart onboarding
+          setIsOnboardingActive(false);
         }
       } catch {
         // Error parsing localStorage — default to starting onboarding
@@ -211,13 +226,14 @@ export function useUserAccount() {
       }
     }
     // If supabaseSession is present, keep the DB‑derived onboarding state.
-  }, [supabaseSession]);
+  }, [supabaseSession, sessionLoaded]);
 
   // Initialize Supabase session on hook mount
   useEffect(() => {
     // Obtain the current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSupabaseSession(session);
+      setSessionLoaded(true);
     });
 
     // Subscribe to authentication state changes
@@ -225,6 +241,7 @@ export function useUserAccount() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       setSupabaseSession(session);
+      setSessionLoaded(true);
     });
 
     return () => {

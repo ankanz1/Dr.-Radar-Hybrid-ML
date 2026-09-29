@@ -241,12 +241,38 @@ export async function syncAccountProvisioning(
   );
 
   if (insertError) {
+    // 23505 on on_conflict=id can only be the users_email_key UNIQUE(email)
+    // constraint: either (a) a concurrent login/StrictMode remount raced us and
+    // this user's own row now exists (INSERT lost the race, row is theirs —
+    // success, never overwrite), or (b) a DIFFERENT public.users row already
+    // owns authUser.email (e.g. password + OAuth duplicate signup for the same
+    // person; RLS hides that row from the SELECT above). Case (a) must be
+    // treated as success; case (b) is a genuine data conflict that MUST surface
+    // (no bypass, no silent swallow) — resolving it needs a service-side merge,
+    // which a client must never attempt.
+    if (insertError.code === '23505') {
+      const { data: raced } = await supabase
+        .from('users')
+        .select('id, onboarding_completed')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      if (raced) {
+        logInfo('users insert lost a concurrent same-user race — row exists, sync complete', {
+          userId: authUser.id,
+          onboardingCompleted: raced.onboarding_completed,
+        });
+        if (role === 'patient') {
+          await ensurePatientProfileRow();
+        }
+        return { ok: true };
+      }
+    }
     logError('public.users insert (sync)', insertError, authUser.id, role);
     return {
       ok: false,
       message: isDev
         ? `public.users provision failed [${insertError.code ?? 'unknown'}]: ${insertError.message}`
-        : 'Could not create your account profile.',
+        : 'This email is already linked to another Dr. Radar account profile. Contact support to merge your accounts.',
     };
   }
   logInfo('users row provisioned (insert-if-missing)', { userId: authUser.id, role });

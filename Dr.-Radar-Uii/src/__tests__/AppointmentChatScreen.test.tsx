@@ -108,6 +108,18 @@ describe('AppointmentChatScreen', () => {
     });
   });
 
+  it('chat appointment context shows the exact scheduled appointment date and time', async () => {
+    // startTime '2026-09-28T10:00:00Z' = the "10:00" slot stored at booking.
+    chatService.fetchChatAppointments.mockResolvedValue({ ok: true, data: APPOINTMENTS });
+    chatService.fetchChatMessages.mockResolvedValue({ ok: true, data: [] });
+    render(<AppointmentChatScreen onNavigate={() => {}} />);
+    await waitFor(() => {
+      const header = screen.getByText(/Appointment Chat/i);
+      expect(header.textContent).toContain('Sep 28, 2026');
+      expect(header.textContent).toContain('10:00');
+    });
+  });
+
   it('opens the exact appointment conversation when given initialAppointmentId (card deep-link)', async () => {
     chatService.fetchChatAppointments.mockResolvedValue({ ok: true, data: APPOINTMENTS });
     chatService.fetchChatMessages.mockResolvedValue({ ok: true, data: [] });

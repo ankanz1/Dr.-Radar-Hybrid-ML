@@ -60,7 +60,10 @@ beforeEach(() => {
   localStorage.removeItem('dr_radar_onboarding_step_v2');
   fromMock.mockReset();
   rpcMock.mockReset();
-  rpcMock.mockResolvedValue({ data: 'patient-row-1', error: null });
+  // Default RPC behavior: ensure_patient_profile (migration 012 patients
+  // self-heal) resolves with a patient id. There is no identity-reconciliation
+  // RPC anymore — sync locates rows only via auth.uid().
+  rpcMock.mockImplementation(() => Promise.resolve({ data: 'patient-row-1', error: null }));
   getSessionMock().mockReset();
   getSessionMock().mockResolvedValue({ data: { session: null } });
   (supabase.auth.signOut as unknown as ReturnType<typeof vi.fn>).mockClear();
@@ -164,25 +167,24 @@ describe('useUserAccount — login-time provisioning', () => {
 
   it('stays authenticated when provisioning fails (no sign-out, no session wipe)', async () => {
     signedInSession();
-    // Pre-check select: missing. Insert: 23505 users_email_key. Race re-select:
-    // still missing → honest failure (a foreign users row owns this email).
-    const missing = chain({ data: null });
-    const insertFail = chain({
-      error: { code: '23505', message: 'duplicate key value violates unique constraint "users_email_key"' },
-    });
-    let usersCalls = 0;
-    fromMock.mockImplementation((table: string) => {
-      if (table !== 'users') return chain({ data: null });
-      usersCalls += 1;
-      return usersCalls === 1 ? missing : usersCalls === 2 ? insertFail : missing;
-    });
+    // The login-time sync itself fails (e.g. DB outage while reading/writing
+    // public.users) — sync surfaces the failure honestly; the session must
+    // stand. The failing mock must be durable (not mockResolvedValueOnce): the
+    // hook's post-sync effect calls fetchOwnUsersRow after this test
+    // completes, and a reset mock returning undefined would raise an unhandled
+    // rejection there.
+    const usersTable = chain({ data: null });
+    (usersTable.maybeSingle as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ data: null, error: { code: 'XX000', message: 'connection terminated unexpectedly' } })
+      .mockResolvedValue({ data: null, error: null });
+    fromMock.mockImplementation((table: string) => (table === 'users' ? usersTable : chain({ data: null })));
 
     const { result } = renderHook(() => useUserAccount());
 
     await waitFor(() =>
       expect(console.error).toHaveBeenCalledWith(
         '[account] login-time provisioning failed:',
-        expect.stringContaining('23505')
+        expect.stringContaining('public.users select failed')
       )
     );
 
@@ -232,9 +234,10 @@ describe('useUserAccount — login-time provisioning', () => {
 
     const { result } = renderHook(() => useUserAccount());
 
-    // The patients RPC only fires from inside the login-time sync — a reliable
-    // "sync finished" marker. (user.onboardingCompleted is DEFAULT-true, so
-    // waiting on it would race the async effect and pass before sync runs.)
+    // The ensure_patient_profile RPC fires from inside the login-time sync —
+    // a reliable "sync ran" marker. (user.onboardingCompleted is
+    // DEFAULT-true, so waiting on it would race the async effect and pass
+    // before sync runs.)
     await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('ensure_patient_profile'));
 
     const countUserQueries = () => fromMock.mock.calls.filter(([t]) => t === 'users').length;

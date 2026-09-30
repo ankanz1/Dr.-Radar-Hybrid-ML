@@ -9,6 +9,7 @@ import {
   DoctorConversation,
   ChatMessage,
 } from '../services/chatService';
+import { formatAppointmentWhen } from '../lib/appointmentTime';
 
 /**
  * Doctor Messages (Phase 4, Step 3) — appointment-scoped patient messaging.
@@ -40,17 +41,6 @@ type MessagesState =
   | { phase: 'loading' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; messages: ChatMessage[] };
-
-function formatAppointmentWhen(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function formatMessageTime(iso: string): string {
   const date = new Date(iso);

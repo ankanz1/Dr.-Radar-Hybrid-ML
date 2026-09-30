@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { ScreenTab } from '../types';
 import { fetchMyAppointments, AppointmentView } from '../services/doctorDirectoryService';
 import { saveJourneyResume, clearJourneyResume } from '../services/journeyState';
+import { formatAppointmentDate, formatAppointmentTime } from '../lib/appointmentTime';
 
 /**
  * Journey step 10 (patient side) — Appointments & Talk With Patient.
@@ -29,18 +30,6 @@ type AppointmentsState =
   | { phase: 'loading' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; appointments: AppointmentView[] };
-
-function formatDateTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 const STATUS_META: Record<AppointmentView['status'], { label: string; className: string }> = {
   scheduled: { label: 'Scheduled', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -145,7 +134,7 @@ export const PatientJourneyAppointmentsScreen: React.FC<PatientJourneyAppointmen
                     <p className="text-[11px] text-slate-500">{appointment.doctorSpecialty ?? 'Consultation'}</p>
                     <p className="text-xs font-semibold text-[#101c28] mt-1 flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[15px] text-emerald-600">event_available</span>
-                      {formatDateTime(appointment.startTime)}
+                      <time>{formatAppointmentDate(appointment.startTime)} · {formatAppointmentTime(appointment.startTime)}</time>
                     </p>
                   </div>
                 </div>
@@ -200,7 +189,9 @@ export const PatientJourneyAppointmentsScreen: React.FC<PatientJourneyAppointmen
               <div key={appointment.id} className="px-4 py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-[#101c28] truncate">{appointment.doctorName}</p>
-                  <p className="text-[11px] text-slate-500 font-mono">{formatDateTime(appointment.startTime)}</p>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {formatAppointmentDate(appointment.startTime)} · {formatAppointmentTime(appointment.startTime)}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${STATUS_META[appointment.status].className}`}>

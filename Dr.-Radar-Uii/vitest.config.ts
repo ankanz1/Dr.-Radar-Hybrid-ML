@@ -15,5 +15,9 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/__tests__/**/*.test.{ts,tsx}'],
     globals: true,
+    // Run test files sequentially: parallel jsdom workers exhaust the Node heap
+    // on large batches (crashed workers surfaced as spurious
+    // "React.act is not a function" cascades). No dependency mismatch exists.
+    fileParallelism: false,
   },
 });

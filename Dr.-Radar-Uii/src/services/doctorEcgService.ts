@@ -24,6 +24,10 @@ export interface AuthorizedPatient {
   patientId: string;
   name: string;
   email: string | null;
+  /** Patient date of birth (public.patients.dob) when stored — null when absent. */
+  dob: string | null;
+  /** Patient gender (public.patients.gender) when stored — null when absent. */
+  gender: string | null;
   latestAnalysisAt: string | null;
   latestPrediction: {
     predictedClass: string;
@@ -99,12 +103,15 @@ export async function fetchAuthorizedPatients(limit = 50): Promise<DoctorService
     return { ok: false, error: `Could not resolve the authenticated doctor: ${resolution.error}` };
   }
 
-  // Minimum identity fields only: name + email. RLS returns just the
-  // appointment-authorized patient rows for this doctor.
+  // Minimum identity fields only: name + email + optional demographics (dob,
+  // gender — columns that already exist on public.patients). RLS returns just
+  // the appointment-authorized patient rows for this doctor.
   const { data: patientRows, error: patientError } = await supabase
     .from('patients')
     .select(
       `id,
+       dob,
+       gender,
        users ( first_name, last_name, email )`
     )
     .limit(limit);
@@ -121,6 +128,8 @@ export async function fetchAuthorizedPatients(limit = 50): Promise<DoctorService
       patientId: row.id as string,
       name,
       email: (usersRow?.email as string | undefined) ?? null,
+      dob: (row.dob as string | null) ?? null,
+      gender: (row.gender as string | null) ?? null,
       latestAnalysisAt: null as string | null,
       latestPrediction: null as AuthorizedPatient['latestPrediction'],
     };

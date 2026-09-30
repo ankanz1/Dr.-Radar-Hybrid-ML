@@ -118,4 +118,32 @@ describe('PatientJourneyAppointmentsScreen Chat buttons', () => {
       expect(container.textContent).toContain('Chat');
     });
   });
+
+  it('appointment card displays doctor + exact stored date + exact stored time', async () => {
+    // startTime '2026-09-30T10:00:00Z' = the "10:00" slot the patient booked.
+    // The card must show the UTC-anchored slot label, not a local-shifted time
+    // and not a generic 'Scheduled'/'Upcoming' label in place of the time.
+    const { container } = render(
+      <PatientJourneyAppointmentsScreen onNavigate={() => {}} onOpenChat={() => {}} />
+    );
+    await waitFor(() => {
+      expect(container.textContent).toContain('Dr. Sarah Khan');
+    });
+    expect(container.textContent).toContain('Sep 30, 2026');
+    expect(container.textContent).toContain('10:00');
+  });
+
+  it('appointment cards show the stored status label alongside the exact time', async () => {
+    const { container } = render(
+      <PatientJourneyAppointmentsScreen onNavigate={() => {}} onOpenChat={() => {}} />
+    );
+    await waitFor(() => {
+      expect(container.textContent).toContain('10:00');
+    });
+    // Status is shown as a badge next to (not instead of) the exact time.
+    expect(container.textContent).toContain('Scheduled');
+    expect(container.textContent).toContain('Completed');
+    // The past card keeps its own stored slot label (09:00 on Sep 1).
+    expect(container.textContent).toContain('09:00');
+  });
 });

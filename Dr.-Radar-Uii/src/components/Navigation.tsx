@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ScreenTab, UserRole, UserAccountState } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { DrRadarLogo } from './DrRadarLogo';
@@ -19,6 +19,70 @@ interface NavigationProps {
   activeAlertsCount?: number;
   onOpenAssistant?: () => void;
 }
+
+/** Roadmap Preview nav section (Phase 5/6/7 prototype screens) — shared by patient & doctor sidebars. */
+const RoadmapNavSection: React.FC<{
+  items: { id: ScreenTab; label: string; icon: string; badge?: string; description: string; matchTabs?: ScreenTab[] }[];
+  currentTab: ScreenTab;
+  onTabChange: (tab: ScreenTab) => void;
+}> = ({ items, currentTab, onTabChange }) => (
+  <div className="pt-3 mt-3 border-t border-slate-200/70">
+    <div className="px-3 pb-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">
+      Roadmap Preview
+    </div>
+    {items.map((item) => {
+      const isActive = item.matchTabs
+        ? item.matchTabs.includes(currentTab)
+        : currentTab === item.id;
+      return (
+        <button
+          key={item.id}
+          id={`nav-${item.id}`}
+          onClick={() => onTabChange(item.id)}
+          aria-current={isActive ? 'page' : undefined}
+          className={`w-full group flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+            isActive
+              ? 'bg-[#ffe8e8] text-[#bc000a] shadow-2xs font-semibold border border-[#bc000a]/20'
+              : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 border border-transparent'
+          }`}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className={`material-symbols-outlined text-[20px] shrink-0 transition-transform group-hover:scale-105 ${
+                isActive ? 'text-[#bc000a]' : 'text-slate-400 group-hover:text-slate-600'
+              }`}
+            >
+              {item.icon}
+            </span>
+            <div className="truncate">
+              <span className="text-xs xl:text-[13px] block leading-snug truncate font-medium">
+                {item.label}
+              </span>
+              <span
+                className={`text-[10px] block truncate font-normal ${
+                  isActive ? 'text-[#bc000a]/80' : 'text-slate-400'
+                }`}
+              >
+                {item.description}
+              </span>
+            </div>
+          </div>
+          {item.badge && (
+            <span
+              className={`text-[9.5px] font-mono font-medium px-1.5 py-0.5 rounded shrink-0 ${
+                isActive
+                  ? 'bg-white/80 text-[#bc000a] border border-[#bc000a]/30'
+                  : 'bg-slate-100 text-slate-500 group-hover:bg-white'
+              }`}
+            >
+              {item.badge}
+            </span>
+          )}
+        </button>
+      );
+    })}
+  </div>
+);
 
 export const Navigation = ({
   currentTab,
@@ -147,6 +211,83 @@ export const Navigation = ({
       matchTabs: ['doctor-messages'],
     },
   ];
+
+  // Phase 5/6/7 roadmap preview navigation (prototype screens)
+  const roadmapNavItems: {
+    id: ScreenTab;
+    label: string;
+    icon: string;
+    badge?: string;
+    description: string;
+    matchTabs?: ScreenTab[];
+  }[] = [
+    {
+      id: 'multidisease',
+      label: 'Multidisease Detection',
+      icon: 'grid_view',
+      badge: 'Preview',
+      description: 'Skin, imaging, cardio & lab modules',
+      matchTabs: [
+        'multidisease',
+        'multidisease-skin',
+        'multidisease-imaging',
+        'multidisease-cardio',
+        'multidisease-laboratory',
+        'multidisease-modules',
+      ],
+    },
+    {
+      id: 'multimodal',
+      label: 'Multimodal AI',
+      icon: 'hub',
+      badge: 'Preview',
+      description: 'Combined data & longitudinal views',
+      matchTabs: [
+        'multimodal',
+        'multimodal-history-labs',
+        'multimodal-imaging-context',
+        'multimodal-risk-profile',
+        'multimodal-longitudinal',
+      ],
+    },
+    {
+      id: 'research-overview',
+      label: 'Clinical Research',
+      icon: 'science',
+      badge: 'Preview',
+      description: 'Validation, explainability & fairness',
+      matchTabs: [
+        'research-overview',
+        'research-validation',
+        'research-prospective',
+        'research-explainability',
+        'research-calibration',
+        'research-fairness',
+        'research-workflow',
+      ],
+    },
+  ];
+
+  const isRoadmapTabActive = [
+    'multidisease',
+    'multidisease-skin',
+    'multidisease-imaging',
+    'multidisease-cardio',
+    'multidisease-laboratory',
+    'multidisease-modules',
+    'multimodal',
+    'multimodal-history-labs',
+    'multimodal-imaging-context',
+    'multimodal-risk-profile',
+    'multimodal-longitudinal',
+    'research-overview',
+    'research-validation',
+    'research-prospective',
+    'research-explainability',
+    'research-calibration',
+    'research-fairness',
+    'research-workflow',
+  ].includes(currentTab);
 
   // Secondary Research & Advanced Tools (For Doctor role only)
   const researchNavItems: {
@@ -321,6 +462,13 @@ export const Navigation = ({
                   </button>
                 );
               })}
+
+              {/* Roadmap Preview section (Phase 5/6/7 prototype screens) */}
+              <RoadmapNavSection
+                items={roadmapNavItems}
+                currentTab={currentTab}
+                onTabChange={onTabChange}
+              />
             </>
           )}
 
@@ -386,6 +534,13 @@ export const Navigation = ({
                   </button>
                 );
               })}
+
+              {/* Roadmap Preview section (Phase 5/6/7 prototype screens) */}
+              <RoadmapNavSection
+                items={roadmapNavItems}
+                currentTab={currentTab}
+                onTabChange={onTabChange}
+              />
 
               {/* Research navigation removed. */}
               <div className="hidden">
@@ -714,30 +869,28 @@ export const Navigation = ({
                 onClick={() => setIsMobileMoreOpen((prev) => !prev)}
                 aria-expanded={isMobileMoreOpen}
                 aria-label="More options"
-                className={`relative flex-1 py-1 px-0.5 flex flex-col items-center justify-center rounded-full transition-all duration-200 focus:outline-none cursor-pointer ${
-                  isMobileMoreOpen || isResearchTabActive || currentTab === 'doctor-reports'
+                className={`relative flex-1 py-1 px-0.5 flex flex-col items-center justify-center rounded-full transition-all duration-200 focus:outline-none cursor-pointer ${                  isMobileMoreOpen || isRoadmapTabActive || isResearchTabActive || currentTab === 'doctor-reports'
                     ? 'text-[#bc000a]'
                     : 'text-[#64748b] hover:text-[#1e293b]'
-                }`}
-              >
-                <span
-                  className={`material-symbols-outlined transition-all text-[20px] px-2.5 py-0.5 rounded-full ${
-                    isMobileMoreOpen || isResearchTabActive || currentTab === 'doctor-reports'
+                  }`}
+                >
+                  <span
+                    className={`material-symbols-outlined transition-all text-[20px] px-2.5 py-0.5 rounded-full ${
+                      isMobileMoreOpen || isRoadmapTabActive || isResearchTabActive || currentTab === 'doctor-reports'
                       ? 'bg-[#ffe8e8] border border-[#fca5a5]/60 text-[#bc000a] shadow-xs scale-105'
                       : 'border border-transparent text-[#64748b]'
                   }`}
                 >
                   {isMobileMoreOpen ? 'close' : 'more_horiz'}
-                </span>
-                <span
-                  className={`text-[9.5px] tracking-tight whitespace-nowrap transition-colors mt-0.5 leading-none ${
-                    isMobileMoreOpen || isResearchTabActive || currentTab === 'doctor-reports'
-                      ? 'font-bold text-[#bc000a]'
-                      : 'font-medium text-[#64748b]'
-                  }`}
-                >
-                  More
-                </span>
+                </span>                  <span
+                    className={`text-[9.5px] tracking-tight whitespace-nowrap transition-colors mt-0.5 leading-none ${
+                      isMobileMoreOpen || isRoadmapTabActive || isResearchTabActive || currentTab === 'doctor-reports'
+                        ? 'font-bold text-[#bc000a]'
+                        : 'font-medium text-[#64748b]'
+                    }`}
+                  >
+                    More
+                  </span>
               </button>
             </>
           )}
@@ -943,6 +1096,58 @@ export const Navigation = ({
                   <span className="material-symbols-outlined text-[15px]">science</span>
                   Research
                 </button>
+              </div>
+
+              {/* Roadmap Preview entries (Phase 5/6/7 prototype screens) */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">
+                  Roadmap Preview
+                </span>
+                {roadmapNavItems.map((item) => {
+                  const isActive = item.matchTabs
+                    ? item.matchTabs.includes(currentTab)
+                    : currentTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      id={`mobile-drawer-${item.id}`}
+                      onClick={() => {
+                        onTabChange(item.id);
+                        setIsMobileMoreOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-3 rounded-2xl text-left transition-all ${
+                        isActive
+                          ? 'bg-[#ffe8e8] border border-[#bc000a]/20 shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100/80 border border-slate-200/70'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                            isActive
+                              ? 'bg-[#bc000a] text-white'
+                              : 'bg-white text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
+                        </div>
+                        <div>
+                          <span
+                            className={`text-xs font-bold ${
+                              isActive ? 'text-[#bc000a]' : 'text-slate-800'
+                            }`}
+                          >
+                            {item.label}
+                          </span>
+                          <p className="text-[10px] text-slate-500">{item.description}</p>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-slate-400 text-[18px]">
+                        chevron_right
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Reports Option */}

@@ -9,6 +9,7 @@ import { fetchMyAppointments, AppointmentView } from '../services/doctorDirector
 import { getAamiClass } from '../data/aamiClassSystem';
 import { AamiClassBadge } from './AamiClassBadge';
 import { AamiClassCode } from '../data/aamiClassSystem';
+import { formatAppointmentDate, formatAppointmentTime } from '../lib/appointmentTime';
 
 /**
  * Journey step 1 — Patient Home ("How is your health?").
@@ -232,6 +233,29 @@ export const JourneyHomeScreen: React.FC<JourneyHomeScreenProps> = ({ user, onNa
           <span className="material-symbols-outlined text-[18px] text-slate-400">chevron_right</span>
         </button>
 
+        {/* --- Roadmap preview entry (Phase 5/6/7 prototype screens) --- */}
+        <button
+          id="journey-roadmap-preview-btn"
+          onClick={() => onNavigate('multidisease')}
+          className="w-full text-left bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:border-[#bc000a]/40 transition-all cursor-pointer flex items-center gap-3"
+        >
+          <span className="w-9 h-9 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-[20px]">science</span>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="text-xs font-bold text-[#101c28]">Explore Health Roadmap</span>
+              <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-violet-700 bg-violet-50 px-1.5 py-0.5 rounded border border-violet-200">
+                Preview
+              </span>
+            </span>
+            <span className="block text-[11px] text-slate-500">
+              Upcoming analysis areas — skin, imaging, labs, multimodal & research tools
+            </span>
+          </span>
+          <span className="material-symbols-outlined text-[18px] text-slate-400">chevron_right</span>
+        </button>
+
         {/* --- Upcoming consultation --- */}
         {upcoming && (
           <button
@@ -245,12 +269,7 @@ export const JourneyHomeScreen: React.FC<JourneyHomeScreenProps> = ({ user, onNa
               <span className="block text-xs font-bold text-[#101c28]">Upcoming consultation</span>
               <span className="block text-[11px] text-slate-600">
                 {upcoming.doctorName} ·{' '}
-                {new Date(upcoming.startTime).toLocaleString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatAppointmentDate(upcoming.startTime)} · {formatAppointmentTime(upcoming.startTime)}
               </span>
             </span>
             <span className="material-symbols-outlined text-[18px] text-emerald-600">chevron_right</span>

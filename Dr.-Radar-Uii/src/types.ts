@@ -93,7 +93,28 @@ export type ScreenTab =
   | 'quantum-lab'
   | 'experiments'
   | 'explainability'
-  | 'benchmarks';
+  | 'benchmarks'
+  // Phase 5 — Multidisease Detection (research prototype UI; no live models)
+  | 'multidisease'
+  | 'multidisease-skin'
+  | 'multidisease-imaging'
+  | 'multidisease-cardio'
+  | 'multidisease-laboratory'
+  | 'multidisease-modules'
+  // Phase 6 — Multimodal AI (research prototype UI; no multimodal model yet)
+  | 'multimodal'
+  | 'multimodal-history-labs'
+  | 'multimodal-imaging-context'
+  | 'multimodal-risk-profile'
+  | 'multimodal-longitudinal'
+  // Phase 7 — Clinical Research (research preview UI; planned studies)
+  | 'research-overview'
+  | 'research-validation'
+  | 'research-prospective'
+  | 'research-explainability'
+  | 'research-calibration'
+  | 'research-fairness'
+  | 'research-workflow';
 
 export type ClinicalAreaId = 'cardiology' | 'imaging' | 'cancer' | 'chronic' | 'liver';
 

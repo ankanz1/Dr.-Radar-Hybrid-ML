@@ -348,16 +348,24 @@ const STATUS_BADGE: Record<DoctorAppointmentView['status'], { label: string; cla
   no_show: { label: 'Missed', className: 'bg-amber-50 text-amber-800 border-amber-200' },
 };
 
+/**
+ * Appointment slots are stored as UTC wall clock (migration 014), so the
+ * displayed time must be UTC-anchored to show the exact selected slot.
+ */
 function formatAppointmentTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString(undefined, {
+  return `${date.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
     weekday: 'short',
     month: 'short',
     day: 'numeric',
+  })}, ${date.toLocaleTimeString('en-US', {
+    timeZone: 'UTC',
     hour: '2-digit',
     minute: '2-digit',
-  });
+    hour12: false,
+  })}`;
 }
 
 const DoctorAppointmentsSection: React.FC = () => {

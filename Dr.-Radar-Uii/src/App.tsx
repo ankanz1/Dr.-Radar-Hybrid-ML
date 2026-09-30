@@ -50,6 +50,11 @@ import { AnalysisHubScreen } from './components/AnalysisHubScreen';
 import { ReusableModalityAnalysisScreen } from './components/ReusableModalityAnalysisScreen';
 import { DrRadarLogo } from './components/DrRadarLogo';
 
+// Roadmap prototype screens (Phase 5 / 6 / 7)
+import { MultidiseaseScreen } from './components/roadmap/MultidiseaseScreen';
+import { MultimodalScreen } from './components/roadmap/MultimodalScreen';
+import { ResearchScreen } from './components/roadmap/ResearchScreen';
+
 export default function App() {
   const {
     user,
@@ -363,6 +368,116 @@ const handleCompleteOnboarding = async (
       subtitle: 'Appointment-scoped conversations with your patients',
       icon: 'chat',
       badge: 'Care Team',
+    },
+
+    // Roadmap prototype tabs (Phase 5 / 6 / 7)
+    'multidisease': {
+      title: 'Multidisease Detection',
+      subtitle: 'Roadmap modules for skin, imaging, cardiovascular, laboratory & multi-system analysis — research prototype',
+      icon: 'grid_view',
+      badge: 'Prototype',
+    },
+    'multidisease-skin': {
+      title: 'Skin Disease Detection',
+      subtitle: 'Dermatology image interface concept — Coming Soon',
+      icon: 'healing',
+      badge: 'Coming Soon',
+    },
+    'multidisease-imaging': {
+      title: 'Medical Image Analysis',
+      subtitle: 'X-ray, CT, MRI & ultrasound review concept — Research Preview',
+      icon: 'radiology',
+      badge: 'Research Preview',
+    },
+    'multidisease-cardio': {
+      title: 'Additional Cardiovascular Models',
+      subtitle: 'ECG/QML is available; further cardiac models are planned',
+      icon: 'cardiology',
+      badge: 'Coming Soon',
+    },
+    'multidisease-laboratory': {
+      title: 'Laboratory-Based Risk Models',
+      subtitle: 'Structured lab panels feeding planned risk models — Coming Soon',
+      icon: 'labs',
+      badge: 'Coming Soon',
+    },
+    'multidisease-modules': {
+      title: 'Disease-Specific Prediction Modules',
+      subtitle: 'Organ-system module grid — concepts only, no predictions',
+      icon: 'grid_view',
+      badge: 'Prototype',
+    },
+    'multimodal': {
+      title: 'Multimodal AI',
+      subtitle: 'Concept screens for combining history, labs, imaging & longitudinal context',
+      icon: 'hub',
+      badge: 'Research Preview',
+    },
+    'multimodal-history-labs': {
+      title: 'Clinical History + Laboratory Data',
+      subtitle: 'Combine history and lab context — prototype interaction',
+      icon: 'timeline',
+      badge: 'Prototype',
+    },
+    'multimodal-imaging-context': {
+      title: 'Imaging + Clinical Information',
+      subtitle: 'Paired imaging and context review — prototype layout',
+      icon: 'image_search',
+      badge: 'Prototype',
+    },
+    'multimodal-risk-profile': {
+      title: 'Multimodal Patient Risk Profile',
+      subtitle: 'Cross-domain risk layout — awaiting supported model',
+      icon: 'donut_small',
+      badge: 'Research Preview',
+    },
+    'multimodal-longitudinal': {
+      title: 'Longitudinal Health Tracking',
+      subtitle: 'Health event timeline with future trend placeholders',
+      icon: 'monitoring',
+      badge: 'Prototype',
+    },
+    'research-overview': {
+      title: 'Clinical Research',
+      subtitle: 'Validation, prospective evaluation, explainability, calibration, fairness & workflow frameworks',
+      icon: 'science',
+      badge: 'Research Preview',
+    },
+    'research-validation': {
+      title: 'External Validation',
+      subtitle: 'Independent cohort validation — planned',
+      icon: 'fact_check',
+      badge: 'Coming Soon',
+    },
+    'research-prospective': {
+      title: 'Prospective Evaluation',
+      subtitle: 'Forward-looking study design — planned',
+      icon: 'event_note',
+      badge: 'Coming Soon',
+    },
+    'research-explainability': {
+      title: 'Explainability',
+      subtitle: 'Attribution for supported models — ECG saliency referenced',
+      icon: 'insights',
+      badge: 'Prototype',
+    },
+    'research-calibration': {
+      title: 'Calibration',
+      subtitle: 'Calibration curves & metrics — coming soon',
+      icon: 'straighten',
+      badge: 'Coming Soon',
+    },
+    'research-fairness': {
+      title: 'Bias / Fairness Analysis',
+      subtitle: 'Demographic group comparison — research only',
+      icon: 'balance',
+      badge: 'Research Preview',
+    },
+    'research-workflow': {
+      title: 'Clinical Workflow Evaluation',
+      subtitle: 'Clinician-in-the-loop evaluation loop — planned',
+      icon: 'account_tree',
+      badge: 'Planned',
     },
 
   };
@@ -1044,6 +1159,7 @@ const handleCompleteOnboarding = async (
                   <DoctorPatientsScreen
                     onNavigate={setCurrentTab}
                     initialPatientId={selectedDoctorPatientId}
+                    onSelectPatient={(id) => setSelectedDoctorPatientId(id)}
                   />
                 </motion.div>
               )}
@@ -1093,6 +1209,53 @@ const handleCompleteOnboarding = async (
                       setSelectedDoctorPatientId(patientId);
                       setCurrentTab('doctor-ecg-records');
                     }}
+                  />
+                </motion.div>
+              )}
+
+              {/* ============ ROADMAP PROTOTYPE SCREENS (PHASE 5/6/7) ============ */}
+              {currentTab.startsWith('multidisease') && (
+                <motion.div
+                  key={`multidisease-${currentTab}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <MultidiseaseScreen
+                    initialModule={currentTab}
+                    onNavigate={setCurrentTab}
+                    onOpenEcgAnalysis={() => setCurrentTab('ecg-analysis')}
+                  />
+                </motion.div>
+              )}
+
+              {currentTab.startsWith('multimodal') && (
+                <motion.div
+                  key={`multimodal-${currentTab}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <MultimodalScreen
+                    initialModule={currentTab}
+                    onNavigate={setCurrentTab}
+                  />
+                </motion.div>
+              )}
+
+              {currentTab.startsWith('research') && (
+                <motion.div
+                  key={`research-${currentTab}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <ResearchScreen
+                    initialModule={currentTab}
+                    onNavigate={setCurrentTab}
                   />
                 </motion.div>
               )}

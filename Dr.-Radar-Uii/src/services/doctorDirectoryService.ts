@@ -95,7 +95,7 @@ export async function fetchDoctorNamesByIds(
   const names: Record<string, string> = {};
   for (const row of data as Array<Record<string, unknown>>) {
     const id = row.doctor_id as string;
-    if (wanted.has(id)) {
+    if (wanted.has(id) && String(row.display_name ?? '').trim()) {
       names[id] = String(row.display_name ?? '').trim();
     }
   }
@@ -120,7 +120,18 @@ export interface MyAppointmentsResult {
   error?: string;
 }
 
-/** The signed-in patient's own appointments (RLS: appointments_select_own). */
+/**
+ * The signed-in patient's own appointments (RLS: appointments_select_own).
+ *
+ * The doctors(users) embed is best-effort: under live RLS a patient cannot
+ * read doctors/users rows, so PostgREST resolves the embedded resource to NULL
+ * and the name would fall back to a generic label. When that happens, the
+ * doctor's real display name + specialty are resolved through the SAME
+ * authorized migration-011 directory RPC (list_doctor_directory — public
+ * directory columns only, no health data, no RLS bypass) the Connect screen
+ * uses. This is a data-layer fix so every consumer (appointments list, chat)
+ * gets the real doctor without duplicating resolution in the UI.
+ */
 export async function fetchMyAppointments(limit = 50): Promise<MyAppointmentsResult> {
   const { data, error } = await supabase
     .from('appointments')
@@ -166,6 +177,41 @@ export async function fetchMyAppointments(limit = 50): Promise<MyAppointmentsRes
       reason: (row.reason as string) ?? null,
     };
   });
+
+  // Embedded doctor identity missing (live RLS)? Resolve the real directory
+  // data through the authorized RPC. Non-fatal: on RPC failure the embed
+  // values (or the generic fallback) stay, and rows are still listed.
+  const missingIdentity = appointments.filter(
+    (a) => a.doctorName === 'Doctor' || !a.doctorSpecialty
+  );
+  if (missingIdentity.length > 0) {
+    try {
+      const doctorIds = [...new Set(missingIdentity.map((a) => a.doctorId))];
+      const { data: directoryRows, error: directoryError } = await supabase.rpc('list_doctor_directory');
+      if (!directoryError && Array.isArray(directoryRows)) {
+        const byId = new Map<string, { name: string; specialty: string | null }>();
+        for (const row of directoryRows as Array<Record<string, unknown>>) {
+          const id = row.doctor_id as string;
+          byId.set(id, {
+            name: String(row.display_name ?? '').trim(),
+            specialty: (row.specialty as string) ?? null,
+          });
+        }
+        for (const appointment of appointments) {
+          const directory = byId.get(appointment.doctorId);
+          if (!directory) continue;
+          if (appointment.doctorName === 'Doctor' && directory.name) {
+            appointment.doctorName = directory.name;
+          }
+          if (!appointment.doctorSpecialty && directory.specialty) {
+            appointment.doctorSpecialty = directory.specialty;
+          }
+        }
+      }
+    } catch {
+      // keep embed/fallback values
+    }
+  }
 
   return { ok: true, appointments };
 }
